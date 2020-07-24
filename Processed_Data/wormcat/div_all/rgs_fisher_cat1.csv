@@ -1,0 +1,33 @@
+"","Category","RGS","AC","PValue"
+"30","Transmembrane protein",840,1793,4.82740989304359e-124
+"20","Proteolysis proteasome",344,738,2.78966730738836e-54
+"32","Unknown",1927,8160,4.08357466302069e-48
+"24","Stress response",283,810,2.44311981242739e-28
+"26","Transcription factor",189,581,3.66319836748784e-17
+"18","Protein modification",74,267,1.12406118522003e-05
+"19","Proteolysis general",91,395,0.000393925369647001
+"31","Transmembrane transport",152,861,0.0522489761353848
+"10","Metabolism",253,1577,0.223926742878127
+"8","Globin",7,36,0.336752544871542
+"17","Peroxisome",3,15,0.430104314738695
+"29","Transcription: general machinery",23,145,0.457306335153221
+"28","Transcription: dosage compensation",2,10,0.482672109257658
+"5","Development",45,293,0.496325716998037
+"16","Nucleic acid",35,233,0.551167936665869
+"3","Cilia",8,60,0.688461961210286
+"1","Cell cycle",22,172,0.804333268019582
+"2","Chaperone",10,86,0.828775503326113
+"7","Extracellular material",65,485,0.842279147430067
+"11","mRNA functions",51,390,0.858433437764862
+"27","Transcription: chromatin",27,222,0.883597218988695
+"6","DNA",21,178,0.887463897489866
+"9","Lysosome",9,91,0.923048124194443
+"15","Nuclear pore",2,36,0.968523000010585
+"25","Trafficking",20,203,0.979238659066493
+"13","Neuronal function",32,308,0.986445011721777
+"22","Ribosome",23,244,0.9919456346983
+"12","Muscle function",3,62,0.993967702738008
+"23","Signaling",146,1193,0.994157143860901
+"4","Cytoskeleton",37,369,0.995302184561923
+"14","Non-coding RNA",26,9535,1
+"21","Pseudogene",1,1898,1

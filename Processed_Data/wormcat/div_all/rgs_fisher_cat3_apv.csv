@@ -1,0 +1,21 @@
+"Category","RGS","AC","PValue","Bonferroni"
+"Proteolysis proteasome: E3: F box",282,445,5.50228113367163e-65,1.73321855710656e-62
+"Transmembrane protein: seven transmembrane receptor: srh",167,216,1.33124991809918e-47,4.19343724201242e-45
+"Unknown",1446,5830,8.17375975387224e-47,2.57473432246976e-44
+"Transcription factor: NHR",145,259,1.6907042238536e-30,5.32571830513884e-28
+"Transmembrane protein: seven transmembrane receptor: srw",93,109,1.1708551560185e-29,3.68819374145827e-27
+"Transmembrane protein: seven transmembrane receptor: str",115,193,2.64308752765032e-26,8.32572571209851e-24
+"Stress response: C-type Lectin",124,257,3.85391368409682e-22,1.2139828104905e-19
+"Transmembrane protein: seven transmembrane receptor: srbc",62,70,6.33384094566653e-21,1.99515989788496e-18
+"Transmembrane protein: seven transmembrane receptor: srx",68,101,2.76595539453824e-18,8.71275949279546e-16
+"Transmembrane protein: seven transmembrane receptor: srz",41,61,1.19379002473325e-11,3.76043857790974e-09
+"Transmembrane protein: seven transmembrane receptor: srj",31,40,3.04618664923426e-10,9.59548794508792e-08
+"Transmembrane protein: seven transmembrane receptor: sri ",36,59,1.40873238586146e-09,4.4375070154636e-07
+"Unknown: regulated by multiple stresses",470,2248,2.74706746798194e-09,8.65326252414311e-07
+"Protein modification: carbohydrate",54,127,4.32732684838161e-09,1.36310795724021e-06
+"Transmembrane protein: seven transmembrane receptor: srt",34,58,8.38318030326691e-09,2.64070179552908e-06
+"Metabolism: lipid: o-acyl transferase",33,56,1.25191538064262e-08,3.94353344902425e-06
+"Stress response: detoxification: CYP",36,82,8.07149159113642e-07,0.000254251985120797
+"Transmembrane transport: potassium channel",43,121,6.5124870995226e-06,0.00205143343634962
+"Extracellular Material: chondroitin sulfotransferase",17,27,2.16633052481431e-05,0.00682394115316508
+"Transmembrane protein: seven transmembrane receptor: other",48,153,2.93821563283353e-05,0.00925537924342562

@@ -1,0 +1,215 @@
+"","Category","RGS","AC","PValue"
+"214","Unknown",2212,8160,1.2845512144211e-62
+"141","Signaling: small GTPase",70,183,3.34211401831946e-08
+"185","Transmembrane protein: other",98,308,1.45438950626986e-07
+"77","Neuronal function: synaptic function",80,244,7.08748672677293e-07
+"63","Metabolism: lipid",141,525,1.60662132570652e-06
+"106","Proteolysis proteasome: E3",151,598,1.16625406774827e-05
+"129","Signaling: heteromeric G protein",57,172,1.9240447771158e-05
+"147","Stress response: C-type Lectin",74,257,6.6864219086156e-05
+"210","Transmembrane transport: solute carrier",60,197,8.70539910566459e-05
+"85","Nucleic acid: binding",66,229,0.000153800430872278
+"64","Metabolism: mitochondria",90,343,0.000195357721708031
+"159","Trafficking: ER/Golgi",31,87,0.000510105452131922
+"73","mRNA functions: processing",74,279,0.000515531597024395
+"46","Extracellular material: PGI",22,53,0.000645620662790262
+"47","Extracellular material: secreted protein",19,43,0.000816722532582828
+"139","Signaling: S/T kinase",24,66,0.00165159952702152
+"171","Transcription factor: homeodomain",31,97,0.00213014800811781
+"131","Signaling: lipid",32,102,0.00232161714106671
+"128","Signaling: hedgehog-like",28,90,0.00458537951228079
+"112","Ribosome: biogenesis",19,53,0.00539145709894866
+"39","Extracellular material: collagen",48,185,0.00608641636634261
+"68","Metabolism: other",49,190,0.00618930874971719
+"135","Signaling: other",23,71,0.00648136287226714
+"28","Development: general",25,81,0.00768171134044722
+"25","Cytoskeleton: other",24,77,0.00806173273809009
+"195","Transmembrane transport: chloride channel",16,44,0.00912803529964208
+"100","Proteolysis general: metallopeptidase",34,124,0.00968487916552564
+"93","Protein modification: methyltransferase",23,75,0.0108695994921354
+"98","Proteolysis general: cysteine",15,41,0.0108979007978983
+"167","Transcription factor: ETS",7,12,0.0129729942667229
+"196","Transmembrane transport: extracellular ligand gated channel",19,59,0.0131414796809585
+"187","Transmembrane transport: ABC",17,51,0.014217704591378
+"181","Transcription: general machinery: RNA Pol II",33,124,0.0150066094748548
+"175","Transcription factor: T box",9,21,0.0214545406217504
+"41","Extracellular material: galectin",10,25,0.0221719419210141
+"158","Trafficking: endocytosis",11,29,0.0223690002311731
+"76","Neuronal function: other",14,42,0.0246023669685997
+"67","Metabolism: nucleotide",29,111,0.0257273770494804
+"56","Metabolism: carbohydrate",23,83,0.0266227123051631
+"6","Cell cycle: other",10,26,0.0268513015227871
+"177","Transcription: chromatin modification",30,117,0.0284847647050067
+"31","Development: somatic",31,122,0.0288495755846671
+"54","Metabolism: amino acid",22,82,0.0383191023700123
+"194","Transmembrane transport: calcium channel",8,20,0.03882727586414
+"119","Signaling: AMPK",5,9,0.0396081399810319
+"35","DNA: replication",19,69,0.0428646334251511
+"190","Transmembrane transport: ammonium",4,6,0.0434003607164727
+"204","Transmembrane transport: monocarboxylate",4,6,0.0434003607164727
+"33","DNA: nuclease",7,17,0.0467562458652622
+"149","Stress response: detoxification",35,151,0.0558064899071217
+"176","Transcription factor: ZF",15,53,0.0567143516991819
+"101","Proteolysis general: other",18,68,0.0619314207961605
+"124","Signaling: dual specificity",3,4,0.0660722568642752
+"14","Cilia: other",5,11,0.067718464708493
+"133","Signaling: MAPK",10,32,0.0700713209596912
+"113","Ribosome: EIF",16,60,0.0719704270990131
+"162","Trafficking: vesicle targeting/fusion",17,65,0.0733783059657645
+"83","Nuclear pore: structure",9,28,0.0742725852773032
+"20","Cytoskeleton: innexin",8,24,0.0783268541393396
+"165","Transcription factor: bZIP",8,24,0.0783268541393396
+"208","Transmembrane transport: potassium channel",28,121,0.0807298984347209
+"148","Stress response: dauer",4,8,0.0809283677280838
+"151","Stress response: GST",14,52,0.0838579661793868
+"97","Proteolysis general: carboxypeptidase",6,16,0.0845321238707226
+"34","DNA: repair",17,67,0.0879279609589965
+"117","Ribosome: subunit",22,92,0.089101059741585
+"120","Signaling: calcium",10,34,0.0908529957224583
+"145","Signaling: WNT",9,30,0.0975851830308992
+"153","Stress response: other",13,49,0.100281521550851
+"201","Transmembrane transport: major facilitator",13,49,0.100281521550851
+"92","Protein modification: lipidation",6,17,0.101080837921455
+"140","Signaling: SH domain",5,13,0.104371398566733
+"50","Lysosome: autophagy",8,26,0.104665026402042
+"62","Metabolism: insulin",11,40,0.10608545595549
+"9","Chaperone: DnaJ domain",9,31,0.110653029924528
+"2","Cell cycle: chromosome dynamics",16,65,0.112928245030873
+"27","Development: apoptosis",16,65,0.112928245030873
+"48","Globin",10,36,0.11493570845259
+"134","Signaling: Notch",6,18,0.11918903527352
+"136","Signaling: phosphatase",41,197,0.123034684976765
+"168","Transcription factor: forkhead",5,14,0.125690504727829
+"58","Metabolism: creatine kinase",3,6,0.127405922634804
+"123","Signaling: CDK-like",3,6,0.127405922634804
+"43","Extracellular material: matrix",16,67,0.13256447776525
+"74","Muscle function",15,62,0.132999504621214
+"75","Neuronal function: development",5,15,0.148816095443355
+"213","Transmembrane transport: TRP  channel",5,15,0.148816095443355
+"178","Transcription: chromatin structure",23,105,0.149908663520112
+"80","Non-coding RNA: processing",2,3,0.153073260156667
+"102","Proteolysis general: serine",9,34,0.155267541760179
+"15","Cilia: transition zone",4,11,0.15801375760406
+"17","Cytoskeleton: cadherin",4,11,0.15801375760406
+"169","Transcription factor: GATA",4,11,0.15801375760406
+"22","Cytoskeleton: intermediate filament protein",4,12,0.188112188569249
+"182","Transcription: general machinery: RNA Pol III",4,12,0.188112188569249
+"24","Cytoskeleton: motor protein",10,41,0.188763563493296
+"164","Transcription factor: bHLH",9,36,0.189167903146555
+"105","Proteolysis proteasome: E2",5,17,0.199759278934037
+"90","Protein modification: carbohydrate",26,127,0.205309826942554
+"42","Extracellular material: lectin",2,4,0.208516066254173
+"86","Nucleic acid: helicase",2,4,0.208516066254173
+"91","Protein modification: deacylase",2,4,0.208516066254173
+"137","Signaling: PKD",2,4,0.208516066254173
+"156","Stress response: signaling",2,4,0.208516066254173
+"170","Transcription factor: HMG box",2,4,0.208516066254173
+"155","Stress response: pathogen",35,177,0.211128260741062
+"104","Proteolysis proteasome: 20S",4,13,0.219836326788934
+"150","Stress response: ER",5,18,0.227169956993087
+"5","Cell cycle: meiotic/mitotic spindle",6,23,0.229702772890035
+"8","Chaperone: cyclophilin",7,28,0.22970764814657
+"72","mRNA functions: binding",21,103,0.240163320842409
+"173","Transcription factor: NHR",49,259,0.241048145944604
+"186","Transmembrane protein: seven transmembrane receptor",257,1461,0.252286107290497
+"161","Trafficking: other",4,14,0.252826306280992
+"127","Signaling: frizzled",2,5,0.265493590010132
+"132","Signaling: MAGUK",2,5,0.265493590010132
+"144","Signaling: VEGF",1,1,0.266521101682578
+"193","Transmembrane transport: B12",1,1,0.266521101682578
+"40","Extracellular material: cuticlin",8,35,0.270599672590949
+"23","Cytoskeleton: microtubule",25,128,0.273884974091264
+"152","Stress response: heat",7,30,0.275918079414968
+"36","DNA: telomere",3,10,0.283744858892267
+"122","Signaling: casein kinase",3,10,0.283744858892267
+"188","Transmembrane transport: acid sensing",3,10,0.283744858892267
+"211","Transmembrane transport: sugar",3,10,0.283744858892267
+"19","Cytoskeleton: claudin",4,15,0.286729186695169
+"157","Stress response: thioredoxin",4,15,0.286729186695169
+"200","Transmembrane transport: lipid",4,15,0.286729186695169
+"49","Lysosome: acid phosphatase",7,31,0.299856948568734
+"61","Metabolism: glycolysis",8,37,0.314900701233269
+"189","Transmembrane transport: amino acid",8,37,0.314900701233269
+"66","Metabolism: nicotinate and nicotinamide metabolism",2,6,0.322422053531372
+"126","Signaling: FGF",2,6,0.322422053531372
+"138","Signaling: rhomboid",2,6,0.322422053531372
+"172","Transcription factor: NF",2,6,0.322422053531372
+"180","Transcription: general machinery: RNA Pol I",2,6,0.322422053531372
+"107","Proteolysis proteasome: NEDD",3,11,0.325703387752409
+"38","Extracellular Material: chondroitin sulfotransferase",6,27,0.334113381835351
+"13","Cilia: IFT",8,38,0.337569399821962
+"52","Lysosome: Vacuolar ATPase",5,22,0.344692942824796
+"174","Transcription factor: other",7,33,0.348841455365369
+"18","Cytoskeleton: centrosome",3,12,0.367625795289496
+"51","Lysosome: other",3,12,0.367625795289496
+"94","Protein modification: other",3,12,0.367625795289496
+"192","Transmembrane transport: aquaporin",3,12,0.367625795289496
+"121","Signaling: cAMP",1,2,0.371819565302117
+"125","Signaling: extracellular",1,2,0.371819565302117
+"81","Non-coding RNA: small RNA",10,51,0.377906721628594
+"207","Transmembrane transport: other",10,51,0.377906721628594
+"70","Metabolism: polyamine",2,7,0.378140948073248
+"197","Transmembrane transport: GABA",2,7,0.378140948073248
+"16","Cytoskeleton: actin function",8,40,0.38350847443107
+"184","Transmembrane protein: ER",5,24,0.405253874717441
+"71","Metabolism: short chain dehydrogenase",8,42,0.429691775778818
+"84","Nuclear pore: transport",2,8,0.431824108513038
+"109","Proteolysis proteasome: ubiquitin",2,8,0.431824108513038
+"143","Signaling: TOR",2,8,0.431824108513038
+"160","Trafficking: exocyst",2,8,0.431824108513038
+"206","Transmembrane transport: nucleotide gated channel",2,8,0.431824108513038
+"212","Transmembrane transport: sulfate",2,8,0.431824108513038
+"111","Proteolysis proteasome: ubiquitin peptidase",6,31,0.442638601069209
+"11","Chaperone: other",3,14,0.449598230532654
+"55","Metabolism: amino sugar",3,14,0.449598230532654
+"29","Development: germline",4,20,0.458967969560944
+"60","Metabolism: glutathione",4,20,0.458967969560944
+"89","Protein modification: acyltransferase",1,3,0.461998895646939
+"118","Signaling: AKT",1,3,0.461998895646939
+"166","Transcription factor: CREB",1,3,0.461998895646939
+"209","Transmembrane transport: sodium channel",6,32,0.469410160913048
+"87","Peroxisome: biogenesis",2,9,0.482907604093152
+"1","Cell cycle: APC",3,16,0.526869508261951
+"179","Transcription: dosage compensation",2,10,0.531031448519648
+"198","Transmembrane transport: glutamate channel",2,10,0.531031448519648
+"7","Cell cycle: phosphatase",1,4,0.539230304519506
+"21","Cytoskeleton: integrin",1,4,0.539230304519506
+"44","Extracellular material: mucin",1,4,0.539230304519506
+"45","Extracellular material: other",1,4,0.539230304519506
+"110","Proteolysis proteasome: ubiquitin domain",1,4,0.539230304519506
+"163","Transcription factor: AP2",1,4,0.539230304519506
+"10","Chaperone: HSP",1,5,0.605373152172573
+"26","Cytoskeleton: paxillin",1,5,0.605373152172573
+"30","Development: sex determination",1,5,0.605373152172573
+"59","Metabolism: FMO",1,5,0.605373152172573
+"116","Ribosome: signal recognition",1,5,0.605373152172573
+"130","Signaling: hippo",1,5,0.605373152172573
+"202","Transmembrane transport: metal ion",1,5,0.605373152172573
+"32","DNA: helicase",2,12,0.617707523113936
+"95","Protein modification: SUMO",2,12,0.617707523113936
+"114","Ribosome: other",2,13,0.656181635086926
+"205","Transmembrane transport: nicotinic acid receptor",3,20,0.661188390761319
+"57","Metabolism: carbonic anhydrase",1,6,0.662019745866313
+"115","Ribosome: S6 kinase",1,6,0.662019745866313
+"191","Transmembrane transport: anion",1,6,0.662019745866313
+"99","Proteolysis general: inhibitor",10,66,0.666088795104382
+"203","Transmembrane transport: mitochondrial",5,34,0.676484497086071
+"183","Transcription: other",2,14,0.691485866924353
+"78","Neuronal function: transcription factor",1,7,0.710533701914162
+"12","Chaperone: T complex",1,8,0.752082796144276
+"199","Transmembrane transport: heme",1,8,0.752082796144276
+"4","Cell cycle: kinase",3,24,0.76550669342052
+"88","Protein modification: acetyltransferase",2,17,0.779699334774464
+"142","Signaling: TGF beta",2,17,0.779699334774464
+"146","Signaling: Y kinase",10,75,0.795110312697796
+"103","Proteolysis proteasome: 19S",3,26,0.80695929018315
+"65","Metabolism: molybdenum cofactor",1,10,0.818143043837651
+"154","Stress response: oxidative",3,28,0.842044480974752
+"3","Cell cycle: cyclin",1,11,0.844244097957469
+"37","Extracellular material: chitinase",4,38,0.871270865215444
+"69","Metabolism: pentose phosphate pathway",1,13,0.88574383652577
+"108","Proteolysis proteasome: other",2,23,0.892133115522336
+"53","Major sperm protein",2,31,0.960683218195893
+"96","Proteolysis general: aspartate",1,33,0.99483980664245
+"79","Non-coding RNA: ncRNA",8,7850,1
+"82","Non-coding RNA: tRNA",23,710,1

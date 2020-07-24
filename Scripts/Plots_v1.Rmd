@@ -1,0 +1,1599 @@
+---
+title: "Plots_v1"
+author: "Daehan Lee"
+date: "5/18/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, warning=FALSE, message =FALSE}
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(cowplot)
+library(ggrepel)
+library(ggtree)
+library(readr)
+library(ggsn)
+library(gridExtra)
+library(maps)
+library(ggbeeswarm)
+
+setwd(glue::glue("{dirname(rstudioapi::getActiveDocumentContext()$path)}/.."))
+
+load("Raw/WI_328_list.RData")
+load("Processed_Data/indep_strain_info.RData")
+load("Processed_Data/strain_geo.RData")
+load("Processed_Data/tree_genome_wide.RData")
+load("Processed_Data/PCA.RData")
+load("Processed_Data/umap.RData")
+load("Processed_Data/df_swept_isotype.RData")
+load("Processed_Data/haplotype_plot_df.Rda")
+load("Processed_Data/Ce_Genome-wide_Neutrality_stats.Rda")
+load("Processed_Data/divergent_classification.RData")
+load("Processed_Data/divergent_joined.RData")
+load("Processed_Data/Divergent_chromosome_stats.RData")
+load("Processed_Data/divergent_count_summary.RData")
+load("Processed_Data/CB4856_div_longread.RData")
+load("Processed_Data/LD_decay.RData")
+load("Processed_Data/Ce_Genome-wide_Neutrality_stats.Rda")
+load("Processed_Data/WormCat.RData")
+load("Processed_Data/GO_enrich.RData")
+load("Processed_Data/pathogen_exp.RData")
+load("Processed_Data/Cbr_divergent.RData")
+
+
+df_chr_length <- data.table::fread("Processed_Data/chr_info.tsv") %>%
+  dplyr::filter(V1 != "MtDNA") %>%
+  dplyr::rename(CHROM = V1, stop= V2) %>%
+  dplyr::mutate(start=0)
+
+world <- map_data('world')
+world <- world[world$region != "Antarctica",] # intercourse antarctica
+
+########## Main figures ############
+
+##### Fig. 1 The pacific origin of C. elegans ######
+
+### Fig. 1a map with SNV counts
+
+df_stats_GATK <- data.table::fread("Raw/WI.HARD-FILTERED-strains-stats-psc.tsv")
+
+df_SNV_geo <- df_stats_GATK %>%
+  dplyr::rename(strain = '[3]sample', homo_alt='[5]nNonRefHom', singleton='[11]nSingletons') %>%
+  dplyr::select(strain, homo_alt, singleton) %>%
+  dplyr::left_join(., indep_strain_info_geo, by = 'strain') %>%
+  dplyr::filter(!is.na(long)) 
+
+df_SNV_geo %>%
+  dplyr::group_by(geo) %>%
+  dplyr::summarise(n=n())
+
+plot_map_world_SNV <- 
+  ggplot()+ geom_map(data=world, map=world,
+                     aes(x=long, y=lat, map_id=region),
+                     color="gray51", fill="white", size=0.2, alpha = 0.8)+
+  geom_point(data = df_SNV_geo, aes(x=long, y=lat, size=homo_alt/1e5, fill=geo), shape =21, alpha = 0.7) +
+  theme_map()+
+  theme(legend.position='bottom',
+        legend.title = element_blank(), 
+        legend.text = element_text(size=9, color = "black"),
+        legend.direction = "horizontal", 
+        legend.key.width = unit(0.1,"in"),
+        legend.key.height = unit(0.1,"in"))+
+    scale_fill_manual(values = geo.colours) +
+  scale_size_continuous(range = c(1,8), trans='exp', guide=FALSE) +
+  ggsn::scalebar(data = dplyr::filter(indep_strain_info, !is.na(lat)), dist = 2000, dist_unit = "km", location = "bottomleft",
+             transform = TRUE, model = "WGS84", height = 0.02, st.size = 2.3, st.dist	= 0.03, border.size = 0.3)  +
+  guides(fill= guide_legend(nrow=3))
+
+plot_map_world_SNV
+#ggsave("Map.pdf", width = 7.5, height = 3.5)
+
+Fig1a <- cowplot::plot_grid(plot_map_world_SNV, labels = c("a"), label_size = 12)  
+
+ggsave("Map.pdf", ExFig1a, width = 7.5, height = 4)
+
+### Fig. 1b tree labeled with origin ###
+
+plot_tree_NJ_geo <- ggtree(tree_ph_geo, layout="fan", open.angle=60, branch.length="rate") + 
+  aes(color = label, size = label) + 
+  theme(legend.position = c(0.68,0.4), 
+        legend.title = element_blank(), 
+        legend.text = element_text(size=9, color = "black"),
+        legend.direction = "horizontal", 
+        legend.key.width = unit(0.1,"in"),
+        legend.key.height = unit(0.1,"in"),
+        plot.margin = margin(b=-7, l=-8, r=-1.6, t=-8, unit = "in")) +
+  #theme(legend.position = 'none', legend.text = element_text(size = 10), legend.title = element_blank(), plot.margin = margin(b=-8, l=-10, r=-6, t=-10, unit = "in")) +
+  scale_color_manual(values = c(geo.colours, "Z_link"="gray")) + 
+  guides(col= guide_legend(ncol=9))  +
+  scale_size_manual(values=c(.3,.3,.3,.3,.3,.3,.3,.3,.3,.3,.3,.3,.3,.3,.2))
+
+plot_tree_NJ_geo_rotate <- rotate_tree(plot_tree_NJ_geo,90) %>% flip(639, 642) %>% flip(579,585)
+
+plot_tree_NJ_geo_rotate
+
+ggsave("tree_geo.pdf", plot_tree_NJ_geo_rotate, width = 7.5, height = 5)
+
+
+### Fig. 1c-e PCA with complete site vcf
+
+plot_PC12_all <- df_pcs_noremoval_complete %>%
+  ggplot(.) +
+  geom_text_repel(data=dplyr::filter(df_pcs_noremoval_complete, (PC1 < 0.18 & PC1>0.1) ),  
+                  label=dplyr::filter(df_pcs_noremoval_complete,  (PC1 < 0.18 & PC1>0.1))$strain, 
+                  aes(x=PC1,y=PC2), size = 2.5, force=10, nudge_x=0.015, nudge_y=0.1,
+                  segment.size = 0.2, segment.alpha = 0.5, direction = 'both',
+                  min.segment.length = 0) +  
+  geom_point(shape=21, alpha=0.8, size=2, aes(x=PC1,y=PC2, fill=geo))+
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(x="PC1", y="PC2", fill ="")  +
+  scale_x_continuous(breaks = c(0, 0.1, 0.2)) +
+  guides(fill= guide_legend(nrow=2))
+
+plot_PC12_all
+
+
+### zoom in to three cluster
+
+plot_PC12_all_zoom_ww <- df_pcs_noremoval_complete %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size=2, aes(x=PC1,y=PC2, fill=geo))+
+  geom_text_repel(data=dplyr::filter(df_pcs_noremoval_complete, strain %in% bi_strain),  
+                  label=dplyr::filter(df_pcs_noremoval_complete, strain %in% bi_strain)$strain, 
+                  aes(x=PC1,y=PC2), size = 2.5, force=10, nudge_y=0.02,
+                  segment.size = 0.2, segment.alpha = 0.5, direction = 'both',
+                  min.segment.length = 0) +  
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(fill ="")  +
+  scale_x_continuous(limits = c(-0.02,0.03)) +
+  ylim(-0.02,0.04)+
+  guides(fill= guide_legend(nrow=2))
+
+plot_PC12_all_zoom_ww
+
+plot_PC12_all_zoom_hw <- df_pcs_noremoval_complete %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size=2, aes(x=PC1,y=PC2, fill=geo))+
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(fill ="")  +
+  xlim(0.20,0.22) +
+  ylim(0.26,0.29)
+
+plot_PC12_all_zoom_hw
+
+plot_PC12_all_zoom_pa <- df_pcs_noremoval_complete %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size=2, aes(x=PC1,y=PC2, fill=geo))+
+  geom_text_repel(data=dplyr::filter(df_pcs_noremoval_complete, strain %in% bi_strain),  
+                  label=dplyr::filter(df_pcs_noremoval_complete, strain %in% bi_strain)$strain, 
+                  aes(x=PC1,y=PC2), size = 2.5, force=10, nudge_y=0.01,
+                  segment.size = 0.2, segment.alpha = 0.5, direction = 'both',
+                  min.segment.length = 0) +  
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(fill ="")  +
+  xlim(0.20,0.245) +
+  scale_y_continuous(limits = c(-0.23,-0.15), 
+                     breaks = c(-0.16, -0.18, -0.2, -0.22))
+  
+plot_PC12_all_zoom_pa
+
+PCA_allpop_merged <- cowplot::plot_grid(plot_PC12_all, plot_PC12_all_zoom_hw, plot_PC12_all_zoom_ww, 
+                                        plot_PC12_all_zoom_pa, 
+                                 labels = c("c","d","e","f"), 
+                                 label_size = 12, nrow=2,
+                                 align = 'hv', axis='tblr')  
+
+ggsave(PCA_allpop_merged, file="PCA_allpop_merge.pdf", width = 7.5, height=5.5, unit='in')
+
+
+### Supplementary Fig. 1 EU, HW, NA, AU/NZ strains ###
+
+df_SNV_geo$geo <- factor(df_SNV_geo$geo, levels = c("Africa", "Asia", "Atlantic", "Australia", "Europe",
+                                                    "Hawaii", "New Zealand", "N. America", "S. America"))
+
+plot_geo_counts <- df_SNV_geo %>%
+  ggplot(.) +
+  geom_bar() +
+  aes(x=geo, fill=geo) +
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(legend.position = 'none',
+        panel.grid = element_blank(),
+        axis.title.x=element_blank(),
+        axis.text.x=element_text(size=10, color='black', angle=30, vjust=1, hjust=1)) +
+  labs(y="Isotype counts")
+
+plot_geo_counts
+
+plot_map_world_SNV_EU <- 
+  ggplot()+ geom_map(data=world, map=world,
+                     aes(x=long, y=lat, map_id=region),
+                     color="gray51", fill="white", size=0.2, alpha = 0.8)+
+  geom_point(data = df_SNV_geo, aes(x=long, y=lat, size=homo_alt/1e5, fill=geo), shape =21, alpha = 0.7) +
+  #geom_text_repel(data=dplyr::filter(df_SNV_geo, long < -154 & long > -161),
+  #                label=dplyr::filter(df_SNV_geo, long < -154 & long > -161)$strain, 
+  #                aes(x=long,y=lat), size = 3) +
+  theme_map()+
+  theme(legend.position='none')+
+    scale_fill_manual(values = geo.colours) +
+  scale_size_continuous(range = c(1,8), trans='exp', guide=FALSE) +
+  ggsn::scalebar(data = dplyr::filter(indep_strain_info, !is.na(lat)),  dist = 300, dist_unit = "km", location = "bottomleft",
+             transform = TRUE, model = "WGS84", height = 0.004, border.size = 0.3, st.size = 2.5, st.dist	= 0.005, anchor = c(x = 15, y = 34)) +
+  guides(fill= guide_legend(nrow=3)) +
+  coord_cartesian(x=c(-10, 25), y=c(33, 57))
+
+plot_map_world_SNV_EU
+
+plot_map_world_SNV_HW <- 
+  ggplot()+ geom_map(data=world, map=world,
+                     aes(x=long, y=lat, map_id=region),
+                     color="gray51", fill="white", size=0.2, alpha = 0.8)+
+  geom_point(data = df_SNV_geo, aes(x=long, y=lat, size=homo_alt/1e5, fill=geo), shape =21, alpha = 0.7) +
+  #geom_text_repel(data=dplyr::filter(df_SNV_geo, long < -154 & long > -161),
+  #                label=dplyr::filter(df_SNV_geo, long < -154 & long > -161)$strain, 
+  #                aes(x=long,y=lat), size = 3) +
+  theme_map()+
+  theme(legend.position='none')+
+    scale_fill_manual(values = geo.colours) +
+  scale_size_continuous(range = c(1,8), trans='exp', guide=FALSE) +
+  ggsn::scalebar(data = dplyr::filter(indep_strain_info, !is.na(lat)),  dist = 50, dist_unit = "km", location = "bottomleft",
+             transform = TRUE, model = "WGS84", height = 0.001, border.size = 0.3, st.size = 2.5, st.dist	= 0.001, anchor = c(x = -160, y = 19)) +
+  guides(fill= guide_legend(nrow=3)) +
+  coord_cartesian(x=c(-160.2, -155), y=c(18,23)) 
+
+plot_map_world_SNV_HW
+
+plot_map_world_SNV_NA <- 
+  ggplot()+ geom_map(data=world, map=world,
+                     aes(x=long, y=lat, map_id=region),
+                     color="gray51", fill="white", size=0.2, alpha = 0.8)+
+  geom_point(data = df_SNV_geo, aes(x=long, y=lat, size=homo_alt/1e5, fill=geo), shape =21, alpha = 0.7) +
+  #geom_text_repel(data=dplyr::filter(df_SNV_geo, long < -154 & long > -161),
+  #                label=dplyr::filter(df_SNV_geo, long < -154 & long > -161)$strain, 
+  #                aes(x=long,y=lat), size = 3) +
+  theme_map()+
+  theme(legend.position='none')+
+    scale_fill_manual(values = geo.colours) +
+  scale_size_continuous(range = c(1,8), trans='exp', guide=FALSE) +
+  ggsn::scalebar(data = dplyr::filter(indep_strain_info, !is.na(lat)),  dist = 150, dist_unit = "km", location = "bottomleft",
+             transform = TRUE, model = "WGS84", height = 0.004, border.size = 0.3, st.size = 2.5, st.dist	= 0.005, anchor = c(x = -129, y = 32)) +
+  guides(fill= guide_legend(nrow=3)) +
+  coord_cartesian(x=c(-130, -110), y=c(30,51)) 
+
+plot_map_world_SNV_NA
+
+plot_map_world_SNV_AU <- 
+  ggplot()+ geom_map(data=world, map=world,
+                     aes(x=long, y=lat, map_id=region),
+                     color="gray51", fill="white", size=0.2, alpha = 0.8)+
+  geom_point(data = df_SNV_geo, aes(x=long, y=lat, size=homo_alt/1e5, fill=geo), shape =21, alpha = 0.7) +
+  #geom_text_repel(data=dplyr::filter(df_SNV_geo, long < -154 & long > -161),
+  #                label=dplyr::filter(df_SNV_geo, long < -154 & long > -161)$strain, 
+  #                aes(x=long,y=lat), size = 3) +
+  theme_map()+
+  theme(legend.position='none')+
+    scale_fill_manual(values = geo.colours) +
+  scale_size_continuous(range = c(1,8), trans='exp', guide=FALSE) +
+  ggsn::scalebar(data = dplyr::filter(indep_strain_info, !is.na(lat)),  dist = 500, dist_unit = "km", location = "bottomleft",
+             transform = TRUE, model = "WGS84", height = 0.007, border.size = 0.3, st.size = 2.5, st.dist	= 0.01, anchor = c(x = 115, y = -45)) +
+  guides(fill= guide_legend(nrow=3)) +
+  coord_cartesian(x=c(110, 180), y=c(-56,-6)) 
+  
+plot_map_world_SNV_AU
+
+FigS1 <- cowplot::plot_grid(plot_map_world_SNV_EU, 
+                            plot_map_world_SNV_NA,
+                            plot_map_world_SNV_HW, 
+                            plot_map_world_SNV_AU,
+                            labels = c("a","b","c","d"), 
+                            label_size = 12, nrow=2)  
+ggsave("Plots/Supplementary/geo_strains.pdf", FigS1, width = 7.5, height = 7)
+
+### Supplementary Fig. 2 PCA and origins ###
+
+p1 <- ggpairs(df_pcs_noremoval_complete, columns = c(2:5), upper= 'blank', diag = 'blank', 
+              lower = list(continuous = wrap("points", alpha = 0.8, size = 1.3, shape =21)),
+              mapping = ggplot2::aes(fill = geo)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), 
+        #axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        strip.background = element_blank())
+
+for(i in 1:p1$nrow) {
+  for(j in 1:p1$ncol){
+    p1[i,j] <- p1[i,j] + 
+      scale_fill_manual(values = geo.colours)
+  }
+}
+
+p1
+
+p2 <- ggpairs(df_pcs_out_removal_complete, columns = c(2:5), lower= 'blank', diag = 'blank', 
+              upper = list(continuous = wrap("points", alpha = 0.8, size = 1.3, shape =21)),
+              mapping = ggplot2::aes(fill = geo)) +
+  theme_bw() +
+  theme(panel.grid = element_blank(), 
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        strip.background = element_blank())
+
+for(i in 1:p2$nrow) {
+  for(j in 1:p2$ncol){
+    p2[i,j] <- p2[i,j] + 
+      scale_fill_manual(values = geo.colours)
+  }
+}
+
+p2
+
+p12 <- p2 
+
+for(i in 1:p12$nrow) {
+  for(j in 1:p12$ncol){
+    if (i>j) {
+      
+      p12[i,j] <- p1[i,j]
+    }
+    else {
+      p12[i,j] <- p2[i,j] 
+    }
+    
+  }
+}
+
+p12
+
+ggsave("Plots/Supplementary/PCA_complete.pdf", p12, width = 7.5, height = 7.5, units = "in")
+
+
+### Extended Data Fig. 1 pop structure, sweeps, geography ###
+
+plot_PC12_global <- df_pcs_noremoval_complete_global %>%
+  dplyr::filter(geo != "Unknown") %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size=1.5, aes(x=PC1,y=PC2, fill=geo))+
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.title = element_blank(),
+        legend.position ='none',
+        panel.grid = element_blank())+
+  labs(x="PC1", y="PC2", fill ="")
+
+plot_PC12_global
+
+##### outlier removed
+
+plot_PC12_pruned <- df_pcs_out_removal_complete %>%
+  dplyr::filter(geo != "Unknown") %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.7, size=1.5, aes(x=PC1,y=PC2, fill=geo))+
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.title = element_blank(),
+        legend.position ='none',
+        panel.grid = element_blank())+
+  labs(x="PC1", y="PC2", fill ="")
+
+plot_PC12_pruned
+
+### UMAP plot
+
+plot_umap <- temp_umap %>%
+  dplyr::filter(geo != "Unknown") %>%
+        ggplot(.)+
+        aes(x=X1,y=X2)+
+        geom_point(size = 1.5, shape = 21, aes(fill = geo), alpha = 0.7)+
+        scale_fill_manual(values=geo.colours) +
+        theme_bw() +
+        theme(panel.grid = element_blank(),
+              legend.title=element_blank(),
+              axis.title = element_text(size=11, color = "black"), 
+              axis.text = element_text(size=10, color = "black"),
+              legend.position ='none') +
+        labs(x = "UMAP1", y = "UMAP2")
+
+plot_umap
+
+### overlay with sweeps
+
+plot_PC1_all_sweep <- df_pcs_noremoval_complete %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+  geom_point(shape=21, size = 1.5, alpha = 0.7)+
+  aes(x=PC1, y=filtered_swept_fraction, fill=geo) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position ='none') +
+  labs(y="Fraction swept")+
+  scale_x_continuous(breaks = c(0, 0.1, 0.2))+
+  scale_y_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1))
+
+plot_PC1_global_sweep <- df_pcs_noremoval_complete_global %>%
+  dplyr::filter(geo != "Unknown") %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+   geom_point(shape=21, size = 1.5, alpha = 0.7)+
+  aes(x=PC1, y=filtered_swept_fraction, fill=geo) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(y="Fraction swept")+
+  scale_y_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1)) +
+  guides(fill= guide_legend(nrow=2))
+
+plot_PC1_global_sweep
+
+plot_PC1_pruned_sweep <- df_pcs_out_removal_complete %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+  geom_point(shape=21, size = 1.5, alpha = 0.7)+
+  aes(x=PC1, y=filtered_swept_fraction, fill=geo) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position ='none') +
+  labs(y="Fraction swept")+
+  scale_y_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1))
+
+plot_PC1_pruned_sweep
+
+plot_umap1_sweep <- temp_umap %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+  geom_point(shape=21, aes(fill = geo), size = 1.5, alpha = 0.7)+
+  aes(x=X1, y=filtered_swept_fraction) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position ='none') +
+  labs(y="Fraction swept", x="UMAP1")+
+  scale_y_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1))
+
+plot_PC2_global_sweep <- df_pcs_noremoval_complete_global %>%
+  dplyr::filter(geo != "Unknown") %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+   geom_point(shape=21, size = 1.5, alpha = 0.7)+
+  aes(y=PC2, x=filtered_swept_fraction, fill=geo) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position='none',
+        panel.grid = element_blank())+
+  labs(x="Fraction swept")+
+  scale_y_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1)) +
+  guides(fill= guide_legend(nrow=2))
+
+plot_PC2_pruned_sweep <- df_pcs_out_removal_complete %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+  geom_point(shape=21, size = 1.5, alpha = 0.7)+
+  aes(y=PC2, x=filtered_swept_fraction, fill=geo) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position ='none') +
+  labs(x="Fraction swept")+
+  scale_x_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1))
+
+plot_PC2_pruned_sweep
+
+plot_umap2_sweep <- temp_umap %>%
+  dplyr::left_join(., df_swept_isotype, by='strain') %>%
+  ggplot(.) +
+  geom_point(shape=21, aes(fill = geo), size = 1.5, alpha = 0.7)+
+  aes(y=X2, x=filtered_swept_fraction) +
+  scale_fill_manual(values=geo.colours) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        legend.title=element_blank(),
+        axis.title = element_text(size=11, color = "black"), 
+        axis.text = element_text(size=10, color = "black"),
+        legend.position ='none') +
+  labs(x="Fraction swept", y="UMAP2")+
+  scale_x_continuous(breaks = c(0, 0.2,0.4,0.6,0.8,1))
+
+### merged plots
+
+PCA_merged_sweep <- cowplot::plot_grid(plot_PC12_global, plot_PC12_pruned, plot_umap,
+                                 plot_PC1_global_sweep, plot_PC1_pruned_sweep, plot_umap1_sweep,
+                                 plot_PC2_global_sweep, plot_PC2_pruned_sweep, plot_umap2_sweep,
+                                 labels = c("a","b","c","d","e","f","g","h","i"), 
+                                 label_size = 12, nrow=3,
+                                 align = 'hv', axis='tblr')  
+
+ggsave(PCA_merged_sweep, file="Plots/Extended/PCA_sweep'.pdf", width = 7.5, height=6.5, unit='in')
+
+### Extended Fig. 2 sweeps and geography ###
+
+strain_labels <- plot_df %>%
+  dplyr::ungroup() %>%
+  dplyr::select(plotpoint, isotype) %>%
+  dplyr::distinct() %>%
+  dplyr::arrange(plotpoint)
+
+df_sweep_all <- indep_strain_info_geo %>%
+  dplyr::filter(reference_strain == 1) %>%
+  dplyr::distinct(isotype, geo) %>%
+  dplyr::left_join(., plot_df, by='isotype') %>%
+  dplyr::distinct(isotype, geo, chromosome, filtered_sweep_ratio)
+
+df_sweep_all_summary <- indep_strain_info_geo %>%
+  dplyr::filter(reference_strain == 1) %>%
+  dplyr::distinct(isotype, geo) %>%
+  dplyr::arrange(as.character(geo)) %>%
+  dplyr::left_join(., plot_df, by='isotype') %>%
+  dplyr::filter(!chromosome %in% c("II","III")) %>%
+  dplyr::distinct(isotype, geo, chromosome, isotype_swept_haplotype_length) %>%
+  dplyr::group_by(isotype, geo) %>%
+  dplyr::summarise(sum_sweep = sum(isotype_swept_haplotype_length)) %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct(isotype, geo, sum_sweep) %>%
+  dplyr::group_by(geo) %>%
+  dplyr::mutate(mean_sweep = mean(sum_sweep)) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(desc(mean_sweep, sum_sweep)) %>%
+  dplyr::mutate(plotpoint=row_number())
+
+plot_df_sweep_all <- plot_df %>%
+  dplyr::filter(!chromosome %in% c("II","III")) %>%
+  dplyr::left_join(., df_sweep_all_summary, by = 'isotype')
+
+## sweep in all strains
+
+plot_df_sweep_all$geo <- factor(plot_df_sweep_all$geo, levels = c("Asia", "S. America", "Australia", "Africa","Europe",
+                                                                  "N. America","New Zealand","Atlantic","Hawaii","Unknown"))
+
+plot_sweep_all_hap_hor <- plot_df_sweep_all %>%
+  dplyr::filter(!chromosome %in% c("II","III"), geo != "Unknown") %>%
+  dplyr::rename(plotpoint=plotpoint.y) %>%
+  ggplot(.,
+         aes(xmin = start/1E6, xmax = stop/1E6,
+             ymin = plotpoint - 0.5, ymax = plotpoint + 0.5,
+             fill = swept_haplotype)) +
+  geom_rect() +
+  scale_fill_manual(values = c("Gray", "Red")) +
+  scale_y_continuous(breaks = 1:length(unique(plot_df_sweep_all$isotype)),
+                     labels = df_sweep_all_summary$geo,
+                     expand = c(0, 0), position = 'left') +
+  xlab("Position (Mb)") +
+  theme_bw() +
+  scale_x_continuous(expand = c(0, 0)) +
+  theme(axis.text.x = element_text(size=10, color = "black"), 
+        axis.text.y  = element_blank(), 
+        strip.text.x = element_text(size=9, color = "black"), 
+        legend.position = 'none', axis.title.x = element_text(size=11, color = "black"), 
+        axis.ticks.y = element_blank(), strip.text.y=element_text(size=8, color = "black", angle = 90),  
+        strip.text.y.left = element_text(angle=0),
+        panel.spacing = unit(0.05, "lines"), plot.margin = margin(b=0, l=0.1, r=0.1, t=0.1, unit = "in")) +
+  facet_grid(geo~chromosome, scales="free", space="free_y", switch = 'y')
+
+plot_sweep_all_hap_hor
+
+plot_sweep_all_hor <- df_sweep_all %>%
+  dplyr::filter(!chromosome %in% c("II","III"), geo != "Unknown") %>%
+  ggplot(.) +
+  #geom_jitter(alpha=0.8, size = 0.6) +
+  #geom_boxplot(alpha = 0.7, outlier.size = 0.6) +
+  geom_quasirandom(shape=21, alpha = 0.7) +
+  aes(x=reorder(geo, filtered_sweep_ratio), y= filtered_sweep_ratio, fill=geo) +
+  scale_fill_manual(values = geo.colours) +
+  labs(x="Ancestry", y="Fraction swept")+
+  scale_y_continuous(breaks = c(0.2,0.4,0.6,0.8,1))+
+  #scale_x_discrete(limits = rev(levels(df_unadmix_sweep$geo)))+
+  coord_flip()+
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color='black'), legend.position = 'none', 
+        axis.text = element_text(size=10, color='black'),
+        axis.title.y = element_blank(), strip.background = element_blank(), 
+        strip.text = element_blank(),  panel.spacing = unit(0.1, "lines"), 
+        plot.margin = margin(b=0.1, l=0.2, r=0.1, t=0.1, unit = "in"),
+        panel.grid = element_blank()) +
+  facet_wrap(~chromosome, nrow=1)
+
+plot_sweep_all_hor
+
+plot_sweep_all <- cowplot::plot_grid(plot_sweep_all_hap_hor, plot_sweep_all_hor, 
+                                     ncol=1, rel_heights = c(3,1), align = "hv", axis = "lr",
+                                     labels = c("a", "b"), label_size = 12)
+
+plot_sweep_all
+
+ggsave(plot_sweep_all, file = "Plots/Extended/sweep_geo.pdf", 
+       width = 7.5,
+       height = 11, unit = "in")
+
+##### DataS2. selective sweeps #####
+
+df_sweep_isotype_geo <- plot_df %>%
+  dplyr::filter(!chromosome %in% c("II","III")) %>%
+  dplyr::distinct(isotype, chromosome, filtered_sweep_ratio) %>%
+  dplyr::left_join(., dplyr::distinct(dplyr::filter(indep_strain_info_geo, reference_strain==1), isotype, geo), by='isotype') %>%
+  tidyr::spread(key='chromosome', value='filtered_sweep_ratio') %>%
+  dplyr::arrange(geo,-V) %>%
+  dplyr::rename(isotype_reference_strain=isotype)
+ 
+write.csv(df_sweep_isotype_geo, file="Manuscript/Supplementary_Data/DataS2_fraction_chromsome_swept.csv")
+
+##### Extended Fig.3 Discovery of punctuated hyper-divergent regions ##### 
+
+### Ext Fig. 3a-c popgen statistics landscape ###
+
+plot_theta_all <- neutrality_df %>%
+  dplyr::filter(statistic == "theta_Watterson") %>%
+  ggplot(.) +
+  aes(x= (startWindow+endWindow)/2e6, y= value) +
+  geom_point(size = 0.001, alpha = 0.7) +
+  geom_smooth(span = 0.005, se = F, method = "loess", size = 0.4) +
+  labs(y="Watterson's theta", x="NULL")+
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), axis.text.x = element_blank(), 
+        legend.position = 'none', 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  #scale_y_continuous(breaks = c(0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)) +
+  facet_grid(~CHROM, scales = 'free_x') 
+
+plot_theta_all
+
+plot_pi_all <- neutrality_df %>%
+  dplyr::filter(statistic == "Pi") %>%
+  ggplot(.) +
+  geom_point(size = 0.001, alpha = 0.7) +
+  geom_smooth(span = 0.005, se = F, method = "loess", size = 0.4) +
+  aes(x= (startWindow+endWindow)/2e6, y= value) +
+  labs(x="Genomic Position (Mb)", y="Pi")+
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), axis.text.x = element_blank(), 
+        legend.position = 'none', strip.background = element_blank(), strip.text = element_blank(), 
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  #scale_y_continuous(breaks = c(0, 0.005, 0.01, 0.015, 0.02, 0.025, 0.03)) +
+  facet_grid(~CHROM, scales = 'free_x')
+
+plot_pi_all
+
+plot_TajD_all <- neutrality_df %>%
+  dplyr::filter(statistic == "Tajima.D") %>%
+  ggplot(.) +
+  geom_point(size = 0.001, alpha = 0.7) +
+  geom_smooth(span = 0.005, se = F, method = "loess", size = 0.4) +
+  aes(x= (startWindow+endWindow)/2e6, y= value) +
+  labs(x="Genomic Position (Mb)", y="Tajima's D")+
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color='black'), axis.text.y= element_text(size=10, color='black'), 
+        axis.text.x = element_blank(), legend.position = 'none', 
+        strip.background = element_blank(), strip.text = element_blank(), 
+         panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank()) +
+  facet_grid(~CHROM, scales = 'free_x')
+
+plot_TajD_all
+
+ExFig3 <- cowplot::plot_grid(plot_theta_all, plot_pi_all, plot_TajD_all, ncol=1, rel_heights = c(1.1,1,1.2), labels = c("a", "b", "c"), align = "v", label_size = 12)
+
+ggsave("Plots/Extended/FigE3.pdf", ExFig1, width = 7.5, height = 5, units = "in")
+
+
+### Supplementary Fig. 3 chromosomal popgen statistics #####
+
+neutrality_df2 <- neutrality_df %>%
+  na.omit() %>%
+  dplyr::mutate(START_BIN=startWindow-1, END_BIN=endWindow) %>%
+  dplyr::select(-startWindow, -endWindow) %>%
+  dplyr::mutate(window_ID = paste(CHROM, START_BIN, END_BIN)) %>%
+  dplyr::mutate(location = ifelse(window_ID %in% df_tip_bins$window_ID, "tip", ifelse(window_ID %in% df_arm_bins$window_ID, "arm", "center")))
+
+neutrality_df2 %>%
+  dplyr::group_by(location, statistic) %>%
+  dplyr::summarise(mean_value=mean(value))
+
+neutrality_df2$location <- factor(neutrality_df2$location, levels = c("center", "arm", "tip"))
+neutrality_df2$statistic <- factor(neutrality_df2$statistic, levels = c("theta_Watterson","Pi","Tajima.D"), labels = c("Watterson's estimator (θ)","Nucleotide diversity (π)","Tajima's D"))
+
+### Fig. S3ab popgen statistics landscape in log scale ###
+
+plot_neutrality_all_log <- neutrality_df2 %>%
+  dplyr::filter(statistic!="Tajima's D") %>%
+  ggplot(.) +
+  geom_point(size = 0.001, alpha = 0.7) +
+  geom_smooth(span = 0.005, se = F, method = "loess", size = 0.4) +
+  aes(x= (START_BIN+END_BIN)/2e6, y= log10(value)) +
+  labs(x="Genomic position (Mb)", y="log10(value)")+
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), 
+        axis.text.x = element_blank(), legend.position = 'none', 
+        panel.spacing = unit(0.2, "lines"),
+        panel.grid = element_blank()) +
+  facet_grid(statistic~CHROM, scales = 'free')
+
+plot_neutrality_all_log
+
+### Fig. S3c popgen statistics chromosomal regions ###
+
+plot_neutrality_chroms <- neutrality_df2 %>%
+  dplyr::filter(statistic!="Tajima's D") %>%
+  ggplot(.) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.8) +
+  aes(x=location, y=log10(value)) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_text(size=11, color='black'),
+        axis.text = element_text(size=10, color='black'),
+        panel.spacing = unit(0.2, "lines"),
+        panel.grid = element_blank()) +
+  facet_grid(statistic~CHROM, scales = 'free') +
+  labs(y="log10(value)")
+
+plot_neutrality_chroms
+
+FigS3 <- cowplot::plot_grid(plot_neutrality_all_log,ncol=1, plot_neutrality_chroms, rel_heights = c(1.2,1), labels = c("a", "b"), align = "v", axis = 'lr', label_size = 12)
+
+FigS3
+
+ggsave("Plots/Supplementary/FigS3.png", FigS3, width = 7.5, height = 8.5, units = "in")
+
+nrow(dplyr::filter(neutrality_df2, statistic=="Nucleotide diversity (π)"))
+nrow(dplyr::filter(neutrality_df2, statistic=="Watterson's estimator (θ)"))
+
+Pi_arm <- dplyr::filter(neutrality_df2, statistic=="Nucleotide diversity (π)" & location == "arm")$value
+Pi_center <- dplyr::filter(neutrality_df2, statistic=="Nucleotide diversity (π)" & location == "center")$value
+
+t.test(Pi_arm, Pi_center)
+
+mean(Pi_arm)/mean(Pi_center)
+
+##### Extended Data Fig.4 Characterization of hyper-divergent regions ##### 
+
+### Ext Fig. 4a Example shortread alignment in divergent regions ###
+
+### Ext Fig. 4b ID-divergent-region pipeline flow chart ###
+
+### Ext Fig. 4c Divergent region example - classification, validation with CB4856 long-read ###
+
+plot_CB4856_div_example <- div_longread_freq(df1=df_pacbio, df2_1=div_CB4856_all_select, df2_2=df_CB4856_freq, chr="V",left=520000, right=589000, ymin=60, guide_rownum = 3)
+
+ExFig4a <- cowplot::plot_grid(NULL, labels = c("a"), label_size = 12)
+
+ExFig4bc <- cowplot::plot_grid(NULL, plot_CB4856_div_example, nrow=1, rel_widths = c(6,5), labels = c("b","c"), label_size = 12)
+
+ExFig4 <- cowplot::plot_grid(ExFig4a, ExFig4bc, ncol=1, rel_heights = c(3,2), label_size = 12)
+
+ggsave("Plots/Extended/CB_example.pdf", ExFig4, width = 7.5, height = 6.5, units = "in")
+
+##### Supplementary Fig. 5 Optimization of divergent calling parameters #####
+
+df_accuracy_ <- read.table(file = "Processed_Data/df_accuracy.tsv", header=T)
+
+df_accuracy_summarise <- df_accuracy_ %>%
+  dplyr::distinct(isotype, long_id_threshold, long_cluster_threshold,
+                  long_coverage_threshold,
+                  cov_threshold, count_threshold, cluster_threshold, .keep_all=T) %>%
+  dplyr::group_by(long_id_threshold, long_coverage_threshold, long_cluster_threshold, count_threshold, cov_threshold,cluster_threshold) %>%
+  dplyr::summarise(sum_both = sum(both), sum_short_only = sum(short_only), sum_long_only = sum(long_only), 
+                   mean_accuracy=mean(accuracy), sd_accuracy=sd(accuracy),
+                   mean_accuracy_short=mean(accuracy_short)) %>%
+  dplyr::ungroup()
+  
+plot_accuracy_count <- df_accuracy_ %>%
+  na.omit() %>%
+  dplyr::distinct(isotype, long_id_threshold, long_cluster_threshold,
+                  long_coverage_threshold,
+                  cov_threshold, count_threshold, cluster_threshold, .keep_all=T) %>%
+  dplyr::filter(cluster_threshold==9e3) %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.5, size=1.3) +
+  aes(x=(both+short_only+long_only)/1e3, y=accuracy*100, fill=count_threshold) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=9.5, color='black'), 
+        axis.text.x = element_text(size=9.5, color='black'),
+        legend.text=element_text(size=9, color='black'),
+        legend.title=element_text(size=9, color='black', vjust=1),
+        strip.text=element_text(size=9, color='black'),        
+        legend.position='bottom',
+        panel.grid = element_blank(),
+        panel.spacing = unit(0.1, "lines"),
+        legend.key.height= unit(0.1,"in")) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_x_continuous(expand = c(0.1, 0.1)) +  
+    scale_fill_gradient(low = "grey", high = "red") +
+  facet_wrap(~isotype, ncol=3) +
+  labs(x="Total hyper-divergent regions detected (Mb)", 
+       y="Overlap of hyper-divergent regions between \nlong-read and short-read based approach (%)", 
+       fill = "Count threshold")
+
+plot_accuracy_count
+
+plot_accuracy_coverage <- df_accuracy_ %>%
+  na.omit() %>%
+  dplyr::distinct(isotype, long_id_threshold, long_cluster_threshold,
+                  long_coverage_threshold,
+                  cov_threshold, count_threshold, cluster_threshold, .keep_all=T) %>%
+  dplyr::filter(cluster_threshold==9e3) %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.5, size=1.3) +
+  aes(x=(both+short_only+long_only)/1e3, y=accuracy*100, fill=cov_threshold) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_blank(), 
+        axis.text.y= element_text(size=2, color='transparent'), 
+        axis.text.x = element_text(size=9.5, color='black'),
+        legend.text=element_text(size=9, color='black'),
+        legend.title=element_text(size=9, color='black', vjust=1),
+        strip.text=element_text(size=9, color='black'),        
+        legend.position='bottom',
+        panel.grid = element_blank(),
+        panel.spacing = unit(0.1, "lines"),
+        legend.key.height = unit(0.1,"in")) +
+  scale_y_continuous(expand = c(0.1, 0.1)) +
+  scale_x_continuous(expand = c(0.1, 0.1)) +  
+  scale_fill_gradient(low = "blue", high = "grey") +
+  facet_wrap(~isotype, ncol=3) +
+  labs(x="Total hyper-divergent regions detected (Mb)", 
+       fill = "Coverage threshold")
+
+plot_accuracy_coverage
+
+df_accuracy_final_ <- read.table(file = "Processed_Data/df_accuracy_final.tsv", header=T)
+
+accuracy_pal <- c("#A6CEE3","#1F78B4","#B2DF8A","#33A02C","#FB9A99","#E31A1C",
+                  "#FDBF6F","#FF7F00","#CAB2D6","#6A3D9A","#FFFF99","#B15928",
+                  "#67001F", "turquoise","#053061")
+
+plot_accuracy_final1 <- df_accuracy_final_ %>%
+  na.omit() %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size = 3) +
+  aes(x=(both+long_only)/1e3, y=(both+short_only)/1e3, fill=isotype) +
+    theme_bw() +
+    theme(axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), 
+        axis.text.x = element_text(size=10, color='black'),
+        legend.position='none',
+        panel.grid = element_blank()) +
+    scale_fill_manual(values = accuracy_pal) +
+ labs(x="Short-read detection (Mb)", 
+       y="Long-read detection (Mb)")
+ 
+plot_accuracy_final1
+
+plot_accuracy_final2 <- df_accuracy_final_ %>%
+  na.omit() %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.8, size = 3) +
+  aes(x=(both+short_only+long_only)/1e3, y=accuracy*100, fill=isotype) +
+    theme_bw() +
+    theme(axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), 
+        axis.text.x = element_text(size=10, color='black'),
+        legend.text = element_text(size=9, color='black'),
+        legend.title=element_blank(),
+        legend.key.size = unit(0.1,"in"),
+        panel.grid = element_blank()) +
+  scale_fill_manual(values = accuracy_pal) +
+ labs(x="Total hyper-divergent regions detected (Mb)", 
+       y="Overlap (%)")
+ 
+plot_accuracy_final2
+
+FigS5ab <- cowplot::plot_grid(plot_accuracy_count, plot_accuracy_coverage, labels = c("a","b"), rel_widths = c(8,7), label_size = 12)
+FigS5cd <- cowplot::plot_grid(plot_accuracy_final1, plot_accuracy_final2, labels = c("c","d"), nrow=1, rel_widths = c(5,6), label_size = 12)
+
+FigS5 <- cowplot::plot_grid(FigS5ab, FigS5cd, ncol=1, rel_heights = c(5,2), label_size = 12)
+
+ggsave("Plots/Supplementary/FigS5'.png", FigS5, width = 7.5, height = 9.5, units = "in")
+
+##### Fig. 2 Identification of hyper-divergent regions #####
+
+nrow(dplyr::distinct(df_divergent_final, window_ID))/1e3
+
+nrow(dplyr::distinct(df_divergent_final, window_ID))/sum(df_chr_length$stop)*1e3
+
+df_divergent_final %>%
+  dplyr::distinct(window_ID, mwf,freq_bin) %>%
+  dplyr::group_by(freq_bin) %>%
+  dplyr::summarise(size=n()/1e3)
+
+
+### Fig. 2a Divergent regions of 327 isotypes (no N2) - grouped by admixture groups
+
+div_summary <- df_divergent_final %>%
+  dplyr::distinct(STRAIN, CHROM, cluster_start, cluster_size, cluster_end) %>%
+  na.omit() %>%
+  dplyr::group_by(STRAIN) %>%
+  dplyr::summarise(sum = sum(cluster_size)) %>%
+  dplyr::ungroup() %>%
+  dplyr::arrange(-sum) %>%
+  dplyr::rename(isotype=STRAIN) %>%
+  dplyr::mutate(plotpoint=row_number())
+
+median((na.omit(div_summary$sum)))/1e6  ## 1.639 Mb (median) 
+mean((na.omit(div_summary$sum)))/1e6  ## 1.856 Mb (mean) 
+
+min(div_summary$sum)/sum(df_chr_length$stop)*100
+max(div_summary$sum)/sum(df_chr_length$stop)*100
+
+plot_div_pop <- df_join_div %>%
+  na.omit() %>%
+  ggplot(.) +
+  geom_rect(data=df_chr_length, aes(xmin =  start/1e6, xmax = stop/1e6, ymin = 1, ymax=1.01), color='transparent', fill='transparent', size =0.1) +
+  #geom_segment(data=dplyr::distinct(df_pals_div,div_start, .keep_all=T), aes(x=(start+stop)/2e6, xend=(start+stop)/2e6, y=0.4, yend=327.6), color='red', alpha=0.75, size=0.1) +
+  #geom_segment(data=data.frame(CHROM="I", start=2342215, stop=2356238), aes(x=start/1e6, xend=stop/1e6, y=0.4, yend=327.6), color='blue', alpha=0.75, size=0.1) + ## peel-1, zeel-1
+  #geom_segment(data=data.frame(CHROM="III", start=11116993, stop=11136380), aes(x=start/1e6, xend=stop/1e6, y=0.4, yend=327.6), color='purple', alpha=0.75, size=0.1) + ## sup-35, pha-1
+  geom_rect(aes(xmin =  cluster_start/1e6, xmax = cluster_end/1e6, ymin = plotpoint-0.5 , ymax = plotpoint+0.5), fill = 'black',color='black', size = 0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y  = element_blank(), strip.text = element_text(size=10, color = "black"), legend.position = 'none',axis.title.y = element_text(size=11, color = "black"), axis.title.x=element_blank(), axis.ticks.y = element_blank(), strip.text.y=element_text(size=9, color = "black", angle = 180),  panel.spacing = unit(0.1, "lines"), panel.grid = element_blank()) +
+  scale_y_continuous(expand = c(0.00, 0.00), limits=c(0.4,327.6)) +
+  scale_x_continuous(expand = c(0.02, 0.02), breaks = c(5, 10, 15, 20)) +
+  facet_grid(~CHROM, scales="free",space = 'free') +
+  labs(x="Genomic position (Mb)",y="327 wild isotypes")
+
+plot_div_pop
+
+#ggsave("Plots/plot_div_pop.pdf", plot = plot_div_pop, width = 7.5, height = 5, units = "in")
+
+### Fig. 2b Divergent region landscape (merged and joined) ### 
+
+df_all_cluster_size_freq <- df_divergent_final %>%
+  dplyr::distinct(CHROM, START_BIN, END_BIN, freq) %>%
+  dplyr::arrange(CHROM, START_BIN) %>%
+  join_masks(.) %>%
+  na.omit() %>%
+  dplyr::group_by(CHROM, cluster_start, cluster_end, cluster_size) %>%
+  dplyr::summarise(Frequency = mean(freq)) %>%
+  dplyr::ungroup()
+
+mean(df_all_cluster_size_freq$Frequency)
+sd(df_all_cluster_size_freq$Frequency)
+mean(df_all_cluster_size_freq$cluster_size)/1e3
+median(df_all_cluster_size_freq$cluster_size)/1e3
+sd(df_all_cluster_size_freq$cluster_size)
+
+plot_div_pop_freq <- df_all_cluster_size_freq %>%
+  na.omit() %>%
+  ggplot(.) +
+  geom_rect(data=df_chr_length, aes(xmin =  start/1e6, xmax = stop/1e6, ymin = 0.2, ymax=0.3), color='transparent', fill='transparent', size =0.1) +
+  geom_rect(aes(xmin =  cluster_start/1e6, xmax = cluster_end/1e6, ymin = Frequency-0.01, ymax = Frequency+0.01), color='black', fill='black', size = 0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y = element_text(size=10, color = "black"), legend.position = 'none', axis.title.x = element_text(size=11, color = "black"), axis.title.y = element_text(size=11, color = "black"), panel.spacing = unit(0.1, "lines"), plot.margin = margin(b=0, l=0.1, r=0.1, t=0.1, unit = "in"), panel.grid = element_blank(),
+        strip.background = element_blank(), strip.text = element_blank()) +
+  labs(x="Genomic position (Mb)", y="Frequency") +
+  scale_y_continuous(expand = c(0, 0), limits = c(-0.02,0.7)) +
+  scale_x_continuous(expand = c(0.02, 0.02), breaks = c(5, 10, 15, 20)) +
+  facet_grid(~CHROM, scales="free", space = 'free')
+
+plot_div_pop_freq
+
+### Fig. 2c Divergent regions size for each strain / fraiction variants in divergent regions
+
+#### Fraction variants in divergent regions for every strain
+
+mean(df_divergent_count_summary$div_fraction)
+mean(df_divergent_count_summary$variant_fraction)
+
+plot_divergent_strain_size_varfrac <- df_divergent_count_summary %>%
+  ggplot(.) +
+  geom_point(aes(x=div_fraction*100, y=variant_fraction*100), size = 0.6, alpha =0.8) +
+  geom_text_repel(data=dplyr::filter(df_divergent_count_summary, variant_fraction>0.4), aes(x=div_fraction*100, y=variant_fraction*100, label = STRAIN), size = 2.5, box.padding = 0.2, point.padding = 0.1, segment.size = 0.02, nudge_x = -0.1, nudge_y= 0, segment.alpha = 0) +
+  theme_bw() +
+  theme(axis.title = element_text(size=11, color='black'), axis.text = element_text(size=10, color='black'), panel.grid=element_blank()) +
+  labs(x="Fraction of hyper-divergent regions (%)", y="Variant fraction (%)",plot.margin = margin(b=0.1, l=0.2, r=0.1, t=0.1, unit = "in")) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10))
+
+plot_divergent_strain_size_varfrac
+
+
+### Fig. 2d Divergent regions x geography
+
+df_divergent_strain <- df_divergent_final %>%
+  dplyr::distinct(STRAIN, CHROM, cluster_start, cluster_size, cluster_end) %>%
+  na.omit() %>%
+  dplyr::group_by(STRAIN) %>%
+  dplyr::summarise(sum_div = sum(cluster_size)) %>%
+  dplyr::ungroup()
+
+df_divergent_strain_geo <- df_divergent_strain %>%
+  dplyr::rename(isotype = STRAIN) %>%
+  dplyr::left_join(., indep_strain_info_geo, by ='isotype') %>%
+  dplyr::filter(geo != "Unknown" & reference_strain == 1)
+
+df_divergent_strain_geo$geo <- factor(df_divergent_strain_geo$geo, levels = c("Africa", "Asia", "Atlantic", "Australia", "Europe",
+                                  "Hawaii", "New Zealand", "N. America", "S. America"))
+
+plot_divergent_strain_geo_size <- df_divergent_strain_geo %>%
+  ggplot(.) +
+  geom_point(alpha = 0.6, position=position_jitterdodge(jitter.width = 3), size = 0.4, 
+             aes(x=geo, y=sum_div/1e6, fill = geo)) +
+  geom_boxplot(outlier.alpha = 0, alpha = 0.8, aes(x=geo, y=sum_div/1e6, fill = geo)) +
+  #geom_text_repel(data=dplyr::filter(df_divergent_strain_geo, sum_div>62e5), aes(x=geo, y=sum_div/1e6, label = isotype), size = 2.5, box.padding = 0.2, point.padding = 0.15, segment.size = 0.02, segment.alpha = 0) +
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title.y = element_text(size=11, color='black'), axis.title.x = element_blank(), 
+        axis.text.y = element_text(size=10, color='black'), legend.position = 'none', 
+        axis.text.x = element_text(angle=45, size=10, color='black', vjust=1, hjust=1),
+        plot.margin = margin(b=0.1, l=0.2, r=0.1, t=0.1, unit = "in"), panel.grid = element_blank()) +
+  labs(x="Origin", y="Hyper-divergent\nregions (Mb)") +
+  scale_y_continuous(breaks = c(0, 2, 4, 6, 8, 10, 12))
+
+plot_divergent_strain_geo_size
+
+Fig2ab <- cowplot::plot_grid(plot_div_pop, plot_div_pop_freq, 
+                             labels = c("a","b"), rel_heights = c(2,1), ncol=1, label_size = 12,
+                           align="v", axis='lr')
+
+Fig2cd <- cowplot::plot_grid(plot_divergent_strain_size_varfrac, 
+                             plot_divergent_strain_geo_size, 
+                             labels = c("c","d"), 
+                             rel_widths = c(1,1), ncol=2, label_size = 12)
+
+Fig2 <- cowplot::plot_grid(Fig2ab, Fig2cd, 
+                           rel_heights = c(2,1), ncol=1,
+                             align="hv", axis='tblr')
+
+#Fig2
+
+ggsave("Plots/Main/Fig2.pdf", plot = Fig2,width = 7.5, height = 7.5, units = "in")
+
+##### Fig. S6 Size and frequencies of joined hyper-divergent blocks #####
+
+plot_all_cluster_size_freq <- df_all_cluster_size_freq %>%
+  ggplot(.) +
+  geom_point(aes(x=cluster_size/1e3, y=Frequency, fill=CHROM), size = 2, alpha =0.8, shape=21) +
+  #geom_text_repel(data=dplyr::filter(df_div_common_fraction, frac_freq_strain<0.5), aes(x=total_div_strain/1e3, y=frac_freq_strain*100, label = STRAIN), size = 2.5, box.padding = 0.2, point.padding = 0.1, segment.size = 0.02, nudge_y = 0.1, nudge_x= 0, segment.alpha = 0) +
+  theme_bw() +
+  theme(axis.title = element_text(size=12, color='black'), 
+        axis.text = element_text(size=11, color='black'), 
+        panel.grid=element_blank()) +
+      scale_fill_brewer(palette = "Accent") +
+  labs(x="Size (kb)", y="Average frequencies of bins", fill="Chromosome")
+
+plot_all_cluster_size_freq
+
+ggsave(plot_all_cluster_size_freq, file = "Plots/Supplementary/Div_size_freq.pdf", width=7.5, height=5, unit = 'in')
+
+##### Fig. S7 statistics for divergent regions #####
+
+df_div_stats_genome_summary_gather$location <- factor(df_div_stats_genome_summary_gather$location, levels = c("All", "Center", "Arm", "Tip"), labels = c("All", "Center", "Arms", "Tips"))
+
+plot_div_chrom_comp <- df_div_stats_genome_summary_gather %>%
+  dplyr::filter(stats != "Size") %>%
+  ggplot(.) +
+  geom_col(position = position_dodge(width = 1)) +
+  aes(x=location, y=as.numeric(value), fill=class) +
+  theme_bw() +
+  scale_fill_brewer(palette = 'Set1') +
+  theme(axis.text.x = element_text(size=10, angle = 90, vjust = 0.5, hjust=1, color='black'),
+        axis.title.y = element_blank(), 
+        axis.title.x = element_blank(), 
+        axis.text.y = element_text(size=10, color='black'),
+        legend.title = element_blank(),
+        panel.grid = element_blank(),
+        strip.text = element_text(size=10, color='black'),
+        legend.text = element_text(size=10, color='black'),
+        legend.position = c(0.87,0.40),
+        legend.margin = margin(0,0,0,0))+
+  facet_grid(stats~CHROM, scales = 'free') +
+  labs(y="Statistics")
+
+plot_div_chrom_comp
+
+df_div_stats_genome_summary_gather_spread <- df_div_stats_genome_summary_gather %>%
+  dplyr::mutate(class=ifelse(class=="Hyper-divergent", "Divergent", class)) %>%
+  dplyr::mutate(class=ifelse(class=="Non-divergent", "Non_divergent", class)) %>%
+  tidyr::spread(key=class, value=value) %>%
+  dplyr::mutate(ratio=as.numeric(Divergent)/as.numeric(Non_divergent))
+
+plot_fold_diff_div <- df_div_stats_genome_summary_gather_spread %>%
+  dplyr::filter(stats != "Size") %>%
+  ggplot(.) +
+  geom_col() +
+  aes(x=location, y=as.numeric(ratio)) +
+  theme_bw() +
+  #scale_fill_brewer(palette = 'Set1') +
+  theme(axis.text.x = element_text(size=10, angle = 90, vjust = 0.5, hjust=1, color='black'),
+        axis.title.y = element_text(size=11, color='black'), 
+        axis.title.x = element_blank(), 
+        axis.text.y = element_text(size=10, color='black'),
+        legend.title = element_blank(),
+        panel.grid = element_blank(),
+        strip.text = element_text(size=10, color='black'),
+        legend.text = element_text(size=10, color='black'),
+        legend.background = element_rect(fill = "transparent", colour = "transparent"))+
+  labs(y="Fold difference") +
+  facet_grid(stats~CHROM, scales = 'free')
+
+FigS7 <- cowplot::plot_grid(plot_div_chrom_comp, plot_fold_diff_div, 
+                            labels = c("a","b"), ncol=1, 
+                            align = 'v', rel_heights = c(1.3,1), axis = 'l', label_size = 12)
+
+
+ggsave(FigS7, file = "Plots/Supplementary/FigS7.png", width=7.5, height=9.5, unit = 'in')
+
+
+
+##### DataS3. Divergent regions in each isotype #####
+
+df_divergent_final_isotype <- df_divergent_final %>%
+  dplyr::distinct(STRAIN, CHROM, cluster_start, cluster_size, cluster_end)
+
+write.csv(df_divergent_final_isotype, file="Manuscript/Supplementary_Data/DataS3_divergent_regions_isotypes.csv")
+
+##### DataS4. Divergent regions joined across all isotypes #####
+
+df_all_cluster_size_freq <- df_divergent_final %>%
+  dplyr::distinct(CHROM, START_BIN, END_BIN, freq) %>%
+  dplyr::arrange(CHROM, START_BIN) %>%
+  join_masks(.) %>%
+  na.omit() %>%
+  dplyr::group_by(CHROM, cluster_start, cluster_end, cluster_size) %>%
+  dplyr::summarise(Frequency = mean(freq)) %>%
+  dplyr::ungroup()
+
+write.csv(df_all_cluster_size_freq, file="Manuscript/Supplementary_Data/DataS4_divergent_regions_joined.csv")
+
+##### DataS5. Variants count for div vs non-div in each isotype #####
+
+DataS5 <- df_divergent_count_summary %>%
+  dplyr::mutate(Variant_density_genomewide=total_variant_count/total_bin_count) %>%
+  dplyr::select(STRAIN, Divergent_size_kb=bin_count, Fraction_divergent=div_fraction, 
+                Variant_count_all=total_variant_count, Varaint_count_divergent=variant_sum, Fraction_variant_divergent=variant_fraction,
+                Variant_density_genomewide, Variant_density_divergent=variant_mean) %>%
+  dplyr::mutate(density_fold_divergent = Variant_density_divergent/Variant_density_genomewide)
+
+write.csv(DataS5, file="Manuscript/Supplementary_Data/DataS4_divergent_regions_variant_counts.csv")
+
+
+##### Fig. 3 Balancing selection of hyper-divergent regions #####
+
+### Fig. 3a common hyper-divergent regions ###
+
+df_div_common_fraction <- df_divergent_final %>%
+  dplyr::group_by(STRAIN) %>%
+  dplyr::mutate(total_div_strain = n()) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(STRAIN, freq_bin) %>%
+  dplyr::mutate(n_bin_strain=n(), frac_freq_strain=n()/total_div_strain) %>%
+  dplyr::ungroup() %>%
+  dplyr::distinct(STRAIN, freq_bin, total_div_strain, frac_freq_strain) %>%
+  dplyr::filter(freq_bin == "Common")
+
+df_divergent_strain_common_geo <- df_div_common_fraction %>%
+  dplyr::rename(isotype = STRAIN) %>%
+  dplyr::left_join(., indep_strain_info_geo, by ='isotype') %>%
+  dplyr::filter(geo != "Unknown" & reference_strain == 1)
+
+df_divergent_strain_common_geo$geo <- factor(df_divergent_strain_common_geo$geo, levels = c("Africa", "Asia", "Atlantic", "Australia", "Europe",
+                                                                              "Hawaii", "New Zealand", "N. America", "S. America"))
+
+plot_divergent_strain_geo_common <- df_divergent_strain_common_geo %>%
+  ggplot(.) +
+  geom_point(alpha = 0.6, position=position_jitterdodge(jitter.width = 3), size = 0.4, 
+             aes(x=geo, y=frac_freq_strain*100, fill = geo)) +
+  geom_boxplot(outlier.alpha = 0, alpha = 0.8, aes(x=geo, y=frac_freq_strain*100, fill = geo)) +
+  #geom_text_repel(data=dplyr::filter(df_divergent_strain_geo, sum_div>62e5), aes(x=geo, y=sum_div/1e6, label = isotype), size = 2.5, box.padding = 0.2, point.padding = 0.15, segment.size = 0.02, segment.alpha = 0) +
+  scale_fill_manual(values = geo.colours) +
+  theme_bw() +
+  theme(axis.title.y = element_text(size=11, color='black'), axis.title.x = element_blank(), 
+        axis.text.y = element_text(size=10, color='black'), legend.position = 'none', 
+        axis.text.x = element_text(angle=90, size=10, color='black', vjust=0.6, hjust=1),
+        plot.margin = margin(b=0.1, l=0.2, r=0.1, t=0.2, unit = "in"), panel.grid = element_blank()) +
+  labs(x="Origin", y="Percent common\nhyper-divergent regions (%)")
+
+plot_divergent_strain_geo_common
+
+### Fig. 3b LD decay ###
+
+plot_LDdecay <- df_LDdecay %>%
+  dplyr::filter(dist >= 10) %>%
+  ggplot(.) +
+  aes(x=dist/1e3, y=mean_r2, group=class, linetype = class) +
+  #geom_point(size = 0.01, alpha =0.2, aes(color = class)) +
+  geom_smooth(se = T, size = 0.3, level = 0.999, color='black') + ## `geom_smooth()` using method = 'gam' and formula 'y ~ s(x, bs = "cs")'
+  scale_color_brewer(palette = 'Set1') +
+  scale_linetype(guide=FALSE) +
+  theme_bw() +
+  theme(axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_text(size=11, color='black'), 
+        axis.text.y= element_text(size=10, color='black'), 
+        axis.text.x = element_text(size=10, color='black'), 
+        legend.position = c(0.7,0.85), panel.grid = element_blank(),
+        legend.text =element_text(size=9, color='black'),
+        legend.background = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.width = unit(0.4, "in"),
+        legend.key.height = unit(0.03,"in")) +
+  labs(x = "Distance (kb)", y = "Linkage disequilibrium", linetype = "") +
+  guides(linetype = guide_legend(override.aes = list(size=1.5, alpha = 1))) +
+  scale_x_continuous(expand = c(0.02,0.02))
+
+plot_LDdecay
+
+### Fig. 3c Tajima's D ###
+
+df_divergent_freq_simple <- df_divergent_final %>%
+  dplyr::mutate(startWindow=START_BIN+1, endWindow=END_BIN) %>%
+  dplyr::distinct(CHROM, startWindow, endWindow,freq_bin)
+
+neutrality_df_div <- neutrality_df %>%
+  dplyr::left_join(., df_divergent_freq_simple, by=c('CHROM','startWindow','endWindow')) %>%
+  dplyr::mutate(freq_bin=ifelse(is.na(freq_bin), "Non-divergent", as.character(freq_bin)))
+
+neutrality_df_div$freq_bin <- factor(neutrality_df_div$freq_bin, levels = c("Non-divergent","Rare","Intermediate", "Common"), labels=  c("Not\ndivergent","<1%","1-5%", "≥5%"))
+neutrality_df_div$statistic <- factor(neutrality_df_div$statistic, levels = c("theta_Watterson","Pi","Tajima.D"), labels = c("Watterson's estimator (θ)","Nucleotide diversity (π)","Tajima's D"))
+
+tajimad_div <- neutrality_df_div %>%
+  dplyr::filter(statistic=="Tajima's D") %>%
+  na.omit()
+
+plot_div_TajD <- tajimad_div %>%
+  na.omit() %>%
+  ggplot(.) +
+  #geom_violin() +
+  geom_boxplot(outlier.alpha = 0) +
+  #geom_jitter(size=0.1, alpha = 0.2) +
+  aes(x=freq_bin, y=value) +
+  theme_bw() +
+  theme(axis.title.x = element_blank(), axis.title.y = element_text(size=11, color='black'),
+        axis.text.x = element_text(size=10, color='black'), 
+        axis.text.y = element_text(size=10, color='black'),
+        panel.grid = element_blank()) +
+  labs(y="Tajima's D") +
+  coord_cartesian(ylim=c(-3,3.5))
+
+plot_div_TajD
+
+### Fig. 3d Wormcat ###
+
+plot_wormcat_2 <- df_cat2 %>%
+  dplyr::left_join(., df_cat2_plotpoint, by=c("Category", "layer")) %>%
+  ggplot(.) +
+  geom_vline(xintercept = -log10(0.05), color='blue', size=0.4) +
+  geom_point(alpha=0.9) +
+  aes(x=-log10(Bonferroni), y=plotpoint, shape=group, size=EnrichRatio, fill=RGS) +
+  theme_bw() +
+  scale_y_continuous(breaks = 1:length(unique(df_cat2_plotpoint$Category)), labels = unique(df_cat2_plotpoint$Category), expand=c(0.07,0.07)) +
+  scale_fill_gradient(low = "lightpink", high = "red") +
+  scale_shape_manual(values=c(21, 22), guide=FALSE) +
+  scale_size_continuous(range = c(1,3), breaks = c(2,3,4)) +
+  theme(axis.text = element_text(size=9, color='black'), 
+        axis.title.x = element_text(size=10, color='black'), 
+        axis.title.y = element_blank(), 
+        legend.title = element_text(size=9.5, color='black'), 
+        legend.text = element_text(size=9, color='black'), 
+        legend.direction = "horizontal", 
+        legend.box = "vertical", 
+        legend.position = c(0.58,0.35), legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.2, "in"), 
+        legend.spacing.y = unit(0.05, 'in'), 
+        panel.grid = element_blank(),
+        legend.margin=margin(0,0,0,0, unit= "in"),
+        plot.margin=margin(0.1,0.1,0.1,0.1, unit= "in")) +
+  guides(shape= guide_legend(nrow=2, order = 3, override.aes = list(size=3), title = NULL, title.position = "top"), size= guide_legend(nrow=1, order = 1, title.position = "top"), fill =  guide_colourbar(nrow=1, order =2, title.position = "top")) +
+  labs(x="-log10(corrected p-value)", shape = "Frequency", size = "Fold enrichment", fill = "Gene counts") 
+
+plot_wormcat_2
+
+Fig3ab <- cowplot::plot_grid(plot_divergent_strain_geo_common, plot_LDdecay, labels = c("a","b"),nrow=1, rel_widths = c(1,1), label_size = 12)
+Fig3cd <- cowplot::plot_grid(plot_div_TajD, plot_wormcat_2, labels = c("c","d"),nrow=1, rel_widths = c(1,3), label_size = 12)
+
+Fig3 <- cowplot::plot_grid(Fig3ab, Fig3cd, rel_widths = c(2,1), ncol=1, label_size = 12) 
+
+ggsave("Plots/Main/Fig3.pdf", Fig3, width = 7.5, height = 5.5)
+
+##### Supplementary Fig. 8 Wormcat Layer 1 and 3 #####
+
+plot_wormcat_1 <- df_cat1 %>%
+  dplyr::left_join(., df_cat1_plotpoint, by=c("Category", "layer")) %>%
+  ggplot(.) +
+  geom_point(alpha=0.9) +
+    geom_vline(xintercept = -log10(0.05), color='blue', size=0.4) +
+  aes(x=-log10(Bonferroni), y=plotpoint, shape=group, size=EnrichRatio, fill=RGS) +
+  theme_bw() +
+  #scale_x_continuous(breaks = c(2,4,6,8,10), expand = c(0.2,0.2)) +
+  #scale_y_continuous(breaks = length(GO_list_MF):1, labels = c, name = "", expand = c(0.05,0.05)) +
+  scale_y_continuous(breaks = 1:length(unique(df_cat1_plotpoint$Category)), labels = unique(df_cat1_plotpoint$Category)) +
+  scale_fill_gradient(low = "lightpink", high = "red") +
+  scale_shape_manual(values=c(21, 22)) +
+  scale_size_continuous(range = c(1,4)) +
+  theme(axis.text = element_text(size=10, color='black'), axis.title.x = element_blank(), 
+        axis.title.y = element_blank(), legend.title = element_text(size=10, color='black'), 
+        legend.text = element_text(size=9, color='black'), legend.margin = margin(0,0,0,0), 
+        legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom", 
+        legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.2, "in"), 
+        axis.title.y.right = element_text(size=10, color='black', vjust=2), panel.grid = element_blank()) +
+  guides(shape= guide_legend(nrow=1, order = 3, title.position = "top", override.aes = list(size=3)), 
+         size= guide_legend(nrow=1, order = 2, title.position = "top"), 
+         fill =  guide_colourbar(nrow=1, order = 1, title.position = "top", label.vjust = 2)) +
+  labs(x="-log10(Corrected P-value)", shape = "Frequency", size = "Fold enrichment", fill = "Gene counts") 
+
+plot_wormcat_1
+
+plot_wormcat_3 <- df_cat3 %>%
+  dplyr::left_join(., df_cat3_plotpoint, by=c("Category", "layer")) %>%
+  ggplot(.) +
+  geom_point(alpha=0.9) +
+    geom_vline(xintercept = -log10(0.05), color='blue', size=0.4) +
+  aes(x=-log10(Bonferroni), y=plotpoint, shape=group, size=EnrichRatio, fill=RGS) +
+  theme_bw() +
+  #scale_x_continuous(breaks = c(2,4,6,8,10), expand = c(0.2,0.2)) +
+  #scale_y_continuous(breaks = length(GO_list_MF):1, labels = c, name = "", expand = c(0.05,0.05)) +
+  scale_y_continuous(breaks = 1:length(unique(df_cat3_plotpoint$Category)), labels = unique(df_cat3_plotpoint$Category)) +
+  scale_fill_gradient(low = "lightpink", high = "red", breaks = c(200,400,600)) +
+  scale_shape_manual(values=c(21, 22)) +
+  scale_size_continuous(range = c(1,4)) +
+  theme(axis.text = element_text(size=10, color='black'), axis.title.x = element_text(size=11, color='black'), 
+        axis.title.y = element_blank(), legend.title = element_text(size=10, color='black'), 
+        legend.text = element_text(size=9, color='black'), legend.margin = margin(0,0,0,0), 
+        legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom", 
+        legend.key.height = unit(0.1, "in"), legend.key.width = unit(0.2, "in"), 
+        axis.title.y.right = element_text(size=10, color='black', vjust=2), panel.grid = element_blank()) +
+  guides(shape= guide_legend(nrow=1, order = 3, title.position = "top", override.aes = list(size=3)), 
+         size= guide_legend(nrow=1, order = 2, title.position = "top"), 
+         fill =  guide_colourbar(nrow=1, order = 1, title.position = "top", label.vjust = 2)) +
+  labs(x="-log10(Corrected P-value)", shape = "Frequency", size = "Fold enrichment", fill = "Gene counts") 
+
+plot_wormcat_3
+
+FigS8 <- cowplot::plot_grid(plot_wormcat_1, plot_wormcat_3, 
+                            labels = c("a","b"), ncol=1, 
+                            align = 'v', rel_heights = c(1.5,2), label_size = 12)
+
+FigS8
+
+ggsave(FigS8, file = "Plots/Supplementary/FigS8'.pdf", width=7.5, height=8, unit = 'in')
+
+##### Supplementary Fig. 9 GO enrichment #####
+
+### GO enrichment ###
+
+plot_GO_BP <- df_GO_enrich_BP_sum %>%
+  ggplot(.) +
+  geom_vline(xintercept = -log10(0.05), color='blue', size=0.4) +
+  geom_point(alpha=0.9) +
+  aes(x=-log10(p.adjust), y=plotpoint, shape=freq, size=EnrichRatio, fill=Count, alpha=0.9) +
+  theme_bw() +
+  #scale_x_continuous(breaks = c(0,2,4,6,8,10), expand = c(0.2,0.2)) +
+  scale_y_continuous(breaks = length(GO_list_BP):1, labels = GO_list_BP, name = "", expand = c(0.05,0.05)) +
+  #scale_y_continuous(breaks = length(GO_list_BP):1, labels = GO_list_BP, name = "",sec.axis = dup_axis(labels = df_class_total_BP$class_gene_total, name = "Total gene counts")) +
+  scale_fill_gradient(low = "lightpink", high = "red") +
+  scale_shape_manual(values=c(21, 22)) +
+  scale_size_continuous(range = c(2,4), breaks = c(2,3,4)) +
+  theme(axis.text = element_text(size=10, color='black'), axis.title = element_text(size=11, color='black'), 
+        legend.title = element_text(size=10, color='black'), legend.text = element_text(size=9, color='black'), 
+        legend.position = c(0.7,0.22), panel.grid = element_blank(),
+        legend.direction = "horizontal", legend.box = "vertical",
+        legend.key.height = unit(0.1, "in"), 
+        legend.spacing.y = unit(0.05, 'in'),
+        legend.margin=margin(0,0,0,0, unit= "in")) +
+  guides(shape= guide_legend(nrow=2, order = 3, override.aes = list(size=3), title = NULL, title.position = "top"), size= guide_legend(nrow=1, order = 1, title.position = "top"), fill =  guide_colourbar(nrow=1, order =2, title.position = "top")) +
+  labs(x="-log10(Corrected P-value)", shape = "Frequency", size = "Fold enrichment", fill = "Gene counts") 
+
+plot_GO_BP
+
+plot_GO_MF <- df_GO_enrich_MF_sum %>%
+  ggplot(.) +
+  geom_vline(xintercept = -log10(0.05), color='blue', size=0.4) +
+  geom_point(alpha=0.9) +
+  aes(x=-log10(p.adjust), y=plotpoint, shape=freq, size=EnrichRatio, fill=Count, alpha=0.9) +
+  theme_bw() +
+  #scale_x_continuous(breaks = c(0,2,4,6,8,10), expand = c(0.2,0.2)) +
+  scale_y_continuous(breaks = length(GO_list_MF):1, labels = GO_list_MF, name = "", expand = c(0.05,0.05)) +
+  #scale_y_continuous(breaks = length(GO_list_MF):1, labels = GO_list_MF, name = "",sec.axis = dup_axis(labels = df_class_total_MF$class_gene_total, name = "Total gene counts")) +
+  scale_fill_gradient(low = "lightpink", high = "red") +
+  scale_shape_manual(values=c(21, 22)) +
+  scale_size_continuous(range = c(2,4), breaks = c(2,3,4)) +
+  theme(axis.text = element_text(size=10, color='black'), axis.title = element_text(size=11, color='black'), 
+        legend.title = element_text(size=10, color='black'), legend.text = element_text(size=9, color='black'), 
+        legend.position = c(0.7,0.25), panel.grid = element_blank(),
+        legend.direction = "horizontal", legend.box = "vertical",
+        legend.key.height = unit(0.1, "in"), 
+        legend.spacing.y = unit(0.05, 'in'),
+        legend.margin=margin(0,0,0,0, unit= "in")) +
+  guides(shape= guide_legend(nrow=2, order = 3, override.aes = list(size=3), title = NULL, title.position = "top"), size= guide_legend(nrow=1, order = 1, title.position = "top"), fill =  guide_colourbar(nrow=1, order =2, title.position = "top")) +
+  labs(x="-log10(Corrected P-value)", shape = "Frequency", size = "Fold enrichment", fill = "Gene counts") 
+
+plot_GO_MF
+
+plot_GO_BP_MF <- cowplot::plot_grid(plot_GO_BP, plot_GO_MF, ncol=1, rel_heights = c(1.3,1), labels = c("a", "b"), align = "hv", label_size = 12)
+
+plot_GO_BP_MF
+
+ggsave("Plots/Supplementary/plot_GO_BP_MF.pdf", plot = plot_GO_BP_MF, width = 7.5, height =8, units = "in")
+
+##### Supplementary Fig. 9 co-localization of pals and divergent regions #####
+
+plot_div_pop_pals <- df_join_div %>%
+  na.omit() %>%
+  ggplot(.) +
+     geom_rect(data=df_chr_length, aes(xmin =  start/1e6, xmax = stop/1e6, ymin = 1, ymax=1.01), color='transparent', fill='transparent', size =0.1) +
+    geom_segment(data=dplyr::distinct(df_pals_div,div_start, .keep_all=T), aes(x=(start+stop)/2e6, xend=(start+stop)/2e6, y=0.4, yend=327.6), color='red', alpha=0.75, size=0.1) +
+  #geom_segment(data=data.frame(CHROM="I", start=2342215, stop=2356238), aes(x=start/1e6, xend=stop/1e6, y=0.4, yend=327.6), color='blue', alpha=0.75, size=0.1) + ## peel-1, zeel-1
+  #geom_segment(data=data.frame(CHROM="III", start=11116993, stop=11136380), aes(x=start/1e6, xend=stop/1e6, y=0.4, yend=327.6), color='purple', alpha=0.75, size=0.1) + ## sup-35, pha-1
+  geom_rect(aes(xmin =  cluster_start/1e6, xmax = cluster_end/1e6, ymin = plotpoint-0.5 , ymax = plotpoint+0.5), fill = 'black',color='black', size = 0.1) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y  = element_blank(), strip.text = element_text(size=10, color = "black"), legend.position = 'none',axis.title = element_text(size=11, color = "black"), axis.ticks.y = element_blank(), strip.text.y=element_text(size=9, color = "black", angle = 180),  panel.spacing = unit(0.1, "lines"), panel.grid = element_blank()) +
+  scale_y_continuous(expand = c(0.00, 0.00), limits=c(0.4,327.6)) +
+  scale_x_continuous(expand = c(0.02, 0.02), breaks = c(5, 10, 15, 20)) +
+  facet_grid(~CHROM, scales="free",space = 'free') +
+  labs(x="Genomic position (Mb)",y="327 wild isotypes")
+
+plot_div_pop_pals
+
+ggsave(plot_div_pop_pals, file = "Plots/Supplementary/FigS10.png", width=7.5, height=5, unit = 'in')
+
+##### Supplementary Fig. 11 transcriptional pathogen response #####
+
+patho_genes %>%
+  dplyr::group_by(pathogen) %>%
+  #dplyr::group_by(pathogen, is_divergent) %>%
+  dplyr::summarise(n=n())
+
+t.test(dplyr::filter(patho_genes, pathogen == "Orsay virus" & is_divergent == T)$log2_fold_change,
+       dplyr::filter(patho_genes, pathogen == "Orsay virus" & is_divergent == F)$log2_fold_change)
+
+t.test(dplyr::filter(patho_genes, pathogen == "N. parisii" & is_divergent == T)$log2_fold_change,
+       dplyr::filter(patho_genes, pathogen == "N. parisii" & is_divergent == F)$log2_fold_change)
+
+131/196 #nparisii
+85/130 #orsay
+
+plot_patho1 <- patho_genes %>%
+  ggplot(.) +
+  geom_jitter(width=0.3, alpha= 0.7) +
+  geom_boxplot(outlier.alpha = 0, alpha=0.7) +
+  aes(x=is_divergent, y=log2_fold_change, fill=is_divergent) +
+  theme_bw() +
+  scale_fill_brewer(palette = 'Set1') +
+  theme(axis.text = element_text(size=10, color = "black"),
+        axis.title = element_text(size=11, color = "black"),
+        panel.grid = element_blank(),
+        legend.position = 'none') +
+  facet_grid(~pathogen) +
+  labs(x="Hyper-divergent", y="log2(fold change)")
+
+plot_patho2 <- patho_genes %>%
+  ggplot(.) +
+  geom_jitter(width=0.3, alpha= 0.7) +
+  geom_boxplot(outlier.alpha = 0, alpha=0.7) +
+  aes(x=is_divergent, y=-log10(FDR), fill=is_divergent) +
+  theme_bw() +
+  scale_fill_brewer(palette = 'Set1') +
+  theme(axis.text = element_text(size=10, color = "black"),
+        axis.title = element_text(size=11, color = "black"),
+        panel.grid = element_blank(),
+        legend.position = 'none') +
+  facet_grid(~pathogen) +
+  labs(x="Hyper-divergent", y="-log10(FDR)")
+
+plot_patho3 <- patho_genes %>%
+  ggplot(.) +
+  geom_point(shape=21, alpha=0.6, size =2) +
+  aes(x=log2_fold_change, y=-log10(FDR), fill=is_divergent) +
+  theme_bw() +
+  scale_fill_brewer(palette = 'Set1') +
+  theme(axis.text = element_text(size=10, color = "black"),
+        axis.title = element_text(size=11, color = "black"),
+        panel.grid = element_blank(),
+        legend.position = c(0.7,0.8)) +
+  facet_grid(~pathogen) +
+  labs(x="log2(fold change)", y="-log10(FDR)", fill = "Hyper-divergent")
+
+plot_patho <- cowplot::plot_grid(plot_patho1, plot_patho2, plot_patho3,
+                              labels = c("a","b","c"), ncol=1,
+                              label_size = 12, align= 'hv')
+
+ggsave(plot_patho, file = "Plots/Supplementary/FigS11.png", width=6, height=9, unit = 'in')
+
+
+##### DataS6. Wormcat output #####
+
+df_cat <- rbind(df_cat1, df_cat2, df_cat3)
+
+write.csv(df_cat, file="Manuscript/Supplementary_Data/DataS6_WormCat.csv")
+
+##### DataS7,8. GO enrichment #####
+
+write.csv(df_GO_enrich_BP_sum, file="Manuscript/Supplementary_Data/DataS7_GO_enrich_BP.csv")
+write.csv(df_GO_enrich_MF_sum, file="Manuscript/Supplementary_Data/DataS8_GO_enrich_MF.csv")
+
+
+##### Extended Fig. X C. briggsae divergent regions #####
+
+cbr_plot_div_pop <- cbr_df_join_div %>%
+  na.omit() %>%
+  ggplot(.) +
+  geom_rect(aes(xmin =  cluster_start/1e6, xmax = cluster_end/1e6, ymin = plotpoint-0.5 , ymax = plotpoint+0.5), fill = 'black',color='black', size = 0.2) +
+  #geom_segment(data=cbr_df_common_div, aes(x=(cluster_start+cluster_end)/2e6, xend=(cluster_start+cluster_end)/2e6, y=0.48, yend=36.52), color='brown', alpha=0.7, size=0.1) +
+  #geom_rug(data=cbr_df_common_div, sides="b", color='brown', aes(x=(cluster_start+cluster_end)/2e6), length = unit(0.03, "npc"), size=0.3) +
+  geom_hline(yintercept = 0, color='black', size=0.4) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y  = element_blank(), axis.title.y = element_text(size=11, color = "black"), strip.text = element_text(size=10, color = "black"), 
+        legend.position = 'none', axis.title.x = element_blank(), axis.ticks.y = element_blank(), 
+        strip.text.y=element_text(size=9, color = "black", angle = 180),  
+        panel.spacing = unit(0.1, "lines"), panel.grid = element_blank()) +
+  labs(x="Genomic position (Mb)", y="35 wild C. briggsae strains") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(expand = c(0.02, 0.02), breaks = c(5, 10, 15, 20)) +
+  #facet_grid(cluster~CHROM, scales = 'free', space = 'free') +
+  facet_grid(group~CHROM, scales="free", switch = "y", space = 'free')
+
+cbr_plot_div_pop
+
+cbr_plot_div_pop_rug <- cbr_df_common_div %>%
+  ggplot(.) +
+  geom_rect(data=dplyr::mutate(cbr_df_join_div, group="Common"), aes(xmin =  cluster_start/1e6, xmax = cluster_end/1e6, ymin=0.2, ymax=0.5), 
+            fill = 'transparent',color='transparent', size = 0.2) +
+  geom_rect(color='brown', aes(xmin=cluster_start/1e6, xmax=cluster_end/1e6, ymin=0.2, ymax=0.5), size = 0.2) +
+  theme_bw() +
+  theme(axis.text.x = element_blank(), axis.text.y  = element_blank(), axis.title.y = element_text(size=11, color = "black"), 
+        legend.position = 'none', axis.title.x = element_text(size=11, color = "black"), axis.ticks.y = element_blank(), 
+        panel.spacing = unit(0.1, "lines"), panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_blank(),
+        strip.text.y = element_blank()) +
+  labs(x="Genomic position (Mb)", y="") +
+  scale_x_continuous(expand = c(0.02, 0.02), breaks = c(5, 10, 15, 20)) +
+  scale_y_continuous(expand=c(0,0)) +
+  facet_grid(group~CHROM, scales="free", switch = "y", space = 'free')
+  
+  cbr_plot_div_pop_rug
+  
+  ExFig6 <- cowplot::plot_grid(cbr_plot_div_pop, cbr_plot_div_pop_rug, ncol=1, rel_heights = c(10,1), align = "v")
+  
+  ExFig6
+  
+ggsave("Plots/Extended/cbr_div.pdf", ExFig6, width =  7.5, height = 6)
+
+
+```
